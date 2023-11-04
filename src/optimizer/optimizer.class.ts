@@ -144,6 +144,11 @@ export class Optimizer {
       let ratioString = "";
       let numEvals = 0;
 
+      // Simulated Annealing
+      let temperature = 1.0;
+      // constant cooling rate
+      const coolingRate = 0.001;
+
       const optimistaionStartDate = Date.now();
       let accumulatedTimeSpentByMeasuring = 0;
 
@@ -261,6 +266,9 @@ export class Optimizer {
 
           let kept: boolean;
 
+
+          // Compare the two functions
+          // Local random search: if the new function is better, keep it.
           if (
             // A is not worse and A is new
             (meanrawA <= meanrawB && currentFunctionIsA()) ||
@@ -277,6 +285,13 @@ export class Optimizer {
             kept = false;
             this.revertFunction();
           }
+
+          // Simulated Annealing
+          // Decrease temperature
+          temperature -= coolingRate * temperature;
+
+          Logger.dev(`temperature: ${temperature}`);
+          
           const indexGood = Number(meanrawA > meanrawB);
           const indexBad = 1 - indexGood;
           globals.currentRatio = meanrawCheck / Math.min(meanrawB, meanrawA);
@@ -288,6 +303,7 @@ export class Optimizer {
             .toFixed(4);
 
           per_second_counter++;
+
           if (Date.now() - time > 1000) {
             time = Date.now();
             show_per_second = (per_second_counter + "/s").padStart(6);
