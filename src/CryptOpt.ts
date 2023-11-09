@@ -38,7 +38,6 @@ import { sha1Hash } from "@/paul";
 import type { CryptOpt, CryptoptGlobals, OptimizerArgs } from "@/types";
 
 import Logger from "./helper/Logger.class";
-import { OPTIMIZER } from "./enums";
 
 let parsedArgs = parsedArgsFromCli;
 if (parsedArgs.startFromBestJson) {
@@ -157,7 +156,7 @@ let runResults: RunResult[];
 const allocatedToPopulation = parsedArgs.evals * betRatio; // total for population
 const offspringEvals = allocatedToPopulation / bets; // each of the offspring
 
-if (single) {
+if (single || parsedArgs.optimizer == "SA") {
   const fullArgs = {
     ...parsedArgs,
     logComment: `${parsedArgs.logComment} run`,
