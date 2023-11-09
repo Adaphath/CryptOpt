@@ -1,6 +1,6 @@
 # How to develop
 Follow normal docker installation. Start docker container with binds to src/ and dist/:
-`docker run -v $(pwd)/src:/root/CryptOpt/src -v $(pwd)/dist:/root/CryptOpt/dist --name CryptOpt -ti cryptopt zsh`
+`docker run -v $(pwd)/results:/root/CryptOpt/results -v $(pwd)/src:/root/CryptOpt/src --name CryptOpt -ti cryptopt zsh`
 
 Inside container: `make watch`
 
