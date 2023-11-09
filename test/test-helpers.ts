@@ -52,6 +52,7 @@ export function getTestArgs(filename: string): OptimizerArgs {
     redzone: true,
     framePointer: "omit",
     memoryConstraints: "none",
+    optimizer: "LS",
   };
 }
 

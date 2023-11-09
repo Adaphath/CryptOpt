@@ -30,7 +30,7 @@ import {
 } from "@/bridge/fiat-bridge/constants";
 import { errorOut, ERRORS } from "@/errors";
 
-import { FRAME_POINTER_OPTIONS, MEMORY_CONSTRAINTS_OPTIONS, ParsedArgsT } from "../types";
+import { FRAME_POINTER_OPTIONS, MEMORY_CONSTRAINTS_OPTIONS, OPTIMIZER_OPTIONS, ParsedArgsT } from "../types";
 
 const y = await yargs(process.argv.slice(2));
 
@@ -215,6 +215,12 @@ export const parsedArgs = y
     describe:
       "Defines if memory reads are contraint. 'none' will not enforce anything. All reads are permitted at any time. 'all' enforces that no read from any `argN[n]` happens after any write to `outN[n]`. 'out1-arg1' enforces that no read from arg1[n] is permitted after `out1[n]` has been written (essentially permits mul(r,r,x) and sq(a,a); but not if elemets overlap but not align. (e.g. mul(r+1,r,x)))",
     choices: MEMORY_CONSTRAINTS_OPTIONS,
+  })
+  .option("optimizer", {
+    default: "LS",
+    string: true,
+    describe: "Which optimizer to use. 'LS' for local search, 'SA' for simulated annealing.",
+    choices: OPTIMIZER_OPTIONS,
   })
   .help("help")
   .alias("h", "help")
