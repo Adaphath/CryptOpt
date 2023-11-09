@@ -83,6 +83,7 @@ export class Optimizer {
   private asmStrings: { [k in FUNCTIONS]: string } = {
     [FUNCTIONS.F_A]: "",
     [FUNCTIONS.F_B]: "",
+    [FUNCTIONS.F_BEST]: "",
   };
   private numMut: { [id: string]: number } = {
     permutation: 0,
@@ -149,13 +150,15 @@ export class Optimizer {
       // constant cooling rate
       const coolingRate = 0.001;
 
+      Logger.dev(`optimiser ${this.args.optimizer}`);
+
       const optimistaionStartDate = Date.now();
       let accumulatedTimeSpentByMeasuring = 0;
 
       let currentNameOfTheFunctionThatHasTheMutation = FUNCTIONS.F_A;
       let time = Date.now();
       let show_per_second = "many/s";
-      let per_second_counter = 0;
+      let per_second_counter = 0; 
       const intervalHandle = setInterval(() => {
         if (numEvals > 0) {
           // not first eval, thus we want to mutate.
@@ -184,6 +187,9 @@ export class Optimizer {
           if (this.asmStrings[FUNCTIONS.F_A].includes("undefined")) {
             const p = pathResolve(this.libcheckfunctionDirectory, "with_undefined.asm");
             writeString(p, this.asmStrings[FUNCTIONS.F_A]);
+
+            // set the best function to the undefined one
+            this.asmStrings[FUNCTIONS.F_BEST] = this.asmStrings[FUNCTIONS.F_A];
 
             const e = `\n\n\nNah... we dont want undefined; wrote ${p}, plx fix. \n\n\n`;
             console.error(e);
@@ -269,11 +275,18 @@ export class Optimizer {
 
           // Compare the two functions
           // Local random search: if the new function is better, keep it.
+          // Simulated Annealing: Acceptance Criterion -> Metropolis condition
+
+          // local random search compares meanRawA and meanRawB
+          const mutatedIsBetter = meanrawA <= meanrawB && currentFunctionIsA() || meanrawA >= meanrawB && !currentFunctionIsA();
+
+          // metroplis condition for simulated annealing compares meanRawA and meanRawB 
+          const metropolisCondition = currentFunctionIsA() ? Math.exp((meanrawA - meanrawB) / temperature) > Math.random() : Math.exp((meanrawB - meanrawA) / temperature) > Math.random();
+
+          
           if (
-            // A is not worse and A is new
-            (meanrawA <= meanrawB && currentFunctionIsA()) ||
-            // or B is not worse and B is new
-            (meanrawA >= meanrawB && !currentFunctionIsA())
+            mutatedIsBetter ||
+            (this.args.optimizer === "SA" && metropolisCondition)
           ) {
             Logger.log("kept    mutation");
             kept = true;
@@ -290,7 +303,7 @@ export class Optimizer {
           // Decrease temperature
           temperature -= coolingRate * temperature;
 
-          Logger.dev(`temperature: ${temperature}`);
+          // Logger.dev(`temperature: ${temperature}`);
           
           const indexGood = Number(meanrawA > meanrawB);
           const indexBad = 1 - indexGood;

@@ -3,4 +3,9 @@ export default class Logger {
     console.log(e);
     return e;
   }
+
+  public static dev<T>(e: T): T | undefined {
+    console.warn(e);
+    return e;
+  }
 }

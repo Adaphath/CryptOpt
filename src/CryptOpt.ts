@@ -38,6 +38,7 @@ import { sha1Hash } from "@/paul";
 import type { CryptOpt, CryptoptGlobals, OptimizerArgs } from "@/types";
 
 import Logger from "./helper/Logger.class";
+import { OPTIMIZER } from "./enums";
 
 let parsedArgs = parsedArgsFromCli;
 if (parsedArgs.startFromBestJson) {
@@ -113,14 +114,14 @@ async function allBets(evals: number, bets: number): Promise<RunResult[]> {
       logComment: `${parsedArgs.logComment} ${i}/${bets}`,
       seed: derivedSeed,
     };
-    Logger.log("running a bet with " + JSON.stringify(args, undefined, 2));
+    Logger.dev("running a bet with " + JSON.stringify(args, undefined, 2));
     const runResult = await run(args);
     runRes.push(runResult);
   }
 
   runRes.sort((a, b) => b.ratio - a.ratio); // note: reverse sort
 
-  Logger.log(
+  Logger.dev(
     [
       `Done finding good SEEEDs.`,
       `Starting final optimisation now.`,
