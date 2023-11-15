@@ -169,7 +169,8 @@ export class Optimizer {
 
       const optimistaionStartDate = Date.now();
       let accumulatedTimeSpentByMeasuring = 0;
-
+      
+      // learn something about the improvements
       let highestAbsoluteImprovement = 0;
       let improvementsList: number[] = [];
       let improvementMedian = 0;
@@ -203,6 +204,9 @@ export class Optimizer {
 
         // check if this was the first round
         if (numEvals == 0) {
+          // set the best function to the first one
+          this.asmStrings[FUNCTIONS.F_BEST] = this.asmStrings[FUNCTIONS.F_A];
+
           // then point to fB and continue, write first
           if (this.asmStrings[FUNCTIONS.F_A].includes("undefined")) {
             const p = pathResolve(this.libcheckfunctionDirectory, "with_undefined.asm");
@@ -292,8 +296,8 @@ export class Optimizer {
 
           let kept: boolean;
 
-          Logger.dev(`Mutated function: ${currentNameOfTheFunctionThatHasTheMutation}`);
-          Logger.dev(`analyse Medians: ${meanrawA} ${meanrawB} ${meanrawCheck}`);
+          // Logger.dev(`Mutated function: ${currentNameOfTheFunctionThatHasTheMutation}`);
+          // Logger.dev(`analyse Medians: ${meanrawA} ${meanrawB} ${meanrawCheck}`);
           
           // first calculate the absolute improvement between the mutated and the function before
           const absoluteImprovement = currentFunctionIsA() ? meanrawA - meanrawB : meanrawB - meanrawA;
@@ -306,7 +310,7 @@ export class Optimizer {
 
           const improvementRelativeToBaseline = absoluteImprovement / meanrawCheck;
 
-          Logger.dev(`improvement relative to baseline: ${improvementRelativeToBaseline}`);
+          // Logger.dev(`improvement relative to baseline: ${improvementRelativeToBaseline}`);
 
 
           // Compare the two functions
@@ -319,9 +323,9 @@ export class Optimizer {
           // metroplis condition for simulated annealing
           // use the relative improvement
           // const metropolisCondition = currentFunctionIsA() ? Math.exp((meanrawA - meanrawB) / temperature) : Math.exp((meanrawB - meanrawA) / temperature);
-          const metropolisCondition = Math.exp((-absoluteImprovement) / temperature);
+          const metropolisConditionWorse = Math.exp((-absoluteImprovement) / temperature);
 
-          Logger.dev(`metropolis condition: ${metropolisCondition}`);
+          // Logger.dev(`metropolis condition: ${metropolisConditionWorse}`);
 
           // todo: measure the improvement in relative to the baseline, no absolute values
 
@@ -334,6 +338,11 @@ export class Optimizer {
             currentNameOfTheFunctionThatHasTheMutation = toggleFUNCTIONS(
               currentNameOfTheFunctionThatHasTheMutation,
             );
+
+            // update the best function
+            if (this.compareWithBest(batchSize, numBatches, currentNameOfTheFunctionThatHasTheMutation)) {
+              this.asmStrings[FUNCTIONS.F_BEST] = this.asmStrings[currentNameOfTheFunctionThatHasTheMutation];
+            }
           } else {
             // revert
             kept = false;
@@ -502,5 +511,73 @@ export class Optimizer {
         throw e;
       }
     }
+  }
+
+  private compareWithBest(batchSize: number, numBatches: number, mutatedFunction: FUNCTIONS): boolean {
+    let analyseResult: AnalyseResult | undefined;
+    try {
+      Logger.dev("let the measurements against the best begin!");
+      if (this.args.verbose) {
+        writeString(
+          pathResolve(this.libcheckfunctionDirectory, mutatedFunction === FUNCTIONS.F_A ? "currentA.asm" : "currentB.asm"),
+          this.asmStrings[mutatedFunction],
+        );
+        writeString(
+          pathResolve(this.libcheckfunctionDirectory, "currentBest.asm"),
+          this.asmStrings[FUNCTIONS.F_BEST],
+        );
+      }
+      // here we need the barriers
+      const results = this.measuresuite.measure(batchSize, numBatches, [
+        this.asmStrings[mutatedFunction],
+        this.asmStrings[FUNCTIONS.F_BEST],
+      ]);
+      Logger.log("well done guys. The results are in!");
+
+      // accumulatedTimeSpentByMeasuring += Date.now() - now_measure;
+
+      analyseResult = analyseMeasureResult(results, { batchSize, resultDir: this.args.resultDir });
+
+      //TODO increase numBatches, if the times have a big stddeviation
+      //TODO change batchSize if the avg number is batchSize *= avg(times)/goal ; goal=10000 cycles
+    } catch (e) {
+      const isIncorrect = e instanceof Error && e.message.includes("tested_incorrect");
+      const isInvalid = e instanceof Error && e.message.includes("could not be assembled");
+      if (isInvalid || isIncorrect) {
+        writeString(
+          join(this.args.resultDir, mutatedFunction === FUNCTIONS.F_A ? "tested_incorrect_A.asm" : "tested_incorrect_B.asm"),
+          this.asmStrings[mutatedFunction],
+        );
+        writeString(
+          join(this.args.resultDir, "tested_incorrect_Best.asm"),
+          this.asmStrings[FUNCTIONS.F_BEST],
+        );
+        writeString(
+          join(this.args.resultDir, "tested_incorrect.json"),
+          JSON.stringify({
+            nodes: Model.nodesInTopologicalOrder,
+          }),
+        );
+      }
+
+      if (isIncorrect) {
+        errorOut(ERRORS.measureIncorrect);
+      }
+      if (isInvalid) {
+        errorOut(ERRORS.measureInvalid);
+      }
+      writeString(join(this.args.resultDir, mutatedFunction === FUNCTIONS.F_A ? "generic_error_A.asm" : "generic_error_B.asm"), this.asmStrings[mutatedFunction]);
+      writeString(join(this.args.resultDir, "generic_error_Best.asm"), this.asmStrings[FUNCTIONS.F_BEST]);
+      errorOut(ERRORS.measureGeneric);
+    }
+
+    // we only want to return if the mutated function is better than the best
+    const [meanrawA, meanrawBest, meanrawCheck] = analyseResult.rawMedian;
+
+    Logger.dev(`analyse Medians... mutated: ${meanrawA} best: ${meanrawBest} check: ${meanrawCheck}`);
+
+    const mutatedFunctionIsBetter = meanrawA <= meanrawBest;
+
+    return mutatedFunctionIsBetter;
   }
 }
