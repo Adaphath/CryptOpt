@@ -146,14 +146,34 @@ export class Optimizer {
       let numEvals = 0;
 
       // Simulated Annealing
-      let temperature = 1.0;
-      // constant cooling rate
-      const coolingRate = 0.001;
+      // BR1
+      // θ′ = (k = 8.979, β = 51, α = 0.9163, γ = 83)
+      // const k = 8.979;
+      // const beta = 51;
+      // const gamma = 83;
+      // const alpha = 0.9163;
+
+      // balanced initial temperature = -(AVERAGE_DELTA/(ln(ACCEPTANCE_RATE)))
+      const initialTemperature = -(
+        180 /
+        Math.log(0.8)
+      );
+
+      Logger.dev(`initial temperature: ${initialTemperature}`)
+
+      // BR1 set max gap fixed for now
+      // const initialTemperature = 200 * k;
+      let temperature = initialTemperature;
 
       Logger.dev(`optimiser ${this.args.optimizer}`);
 
       const optimistaionStartDate = Date.now();
       let accumulatedTimeSpentByMeasuring = 0;
+
+      let highestAbsoluteImprovement = 0;
+      let improvementsList: number[] = [];
+      let improvementMedian = 0;
+      let improvementAverage = 0;
 
       let currentNameOfTheFunctionThatHasTheMutation = FUNCTIONS.F_A;
       let time = Date.now();
@@ -272,6 +292,22 @@ export class Optimizer {
 
           let kept: boolean;
 
+          Logger.dev(`Mutated function: ${currentNameOfTheFunctionThatHasTheMutation}`);
+          Logger.dev(`analyse Medians: ${meanrawA} ${meanrawB} ${meanrawCheck}`);
+          
+          // first calculate the absolute improvement between the mutated and the function before
+          const absoluteImprovement = currentFunctionIsA() ? meanrawA - meanrawB : meanrawB - meanrawA;
+
+          // update the highest absolute improvement
+          highestAbsoluteImprovement = Math.min(highestAbsoluteImprovement, absoluteImprovement);
+
+          // update the list of improvements
+          improvementsList.push(absoluteImprovement);
+
+          const improvementRelativeToBaseline = absoluteImprovement / meanrawCheck;
+
+          Logger.dev(`improvement relative to baseline: ${improvementRelativeToBaseline}`);
+
 
           // Compare the two functions
           // Local random search: if the new function is better, keep it.
@@ -280,13 +316,18 @@ export class Optimizer {
           // local random search compares meanRawA and meanRawB
           const mutatedIsBetter = meanrawA <= meanrawB && currentFunctionIsA() || meanrawA >= meanrawB && !currentFunctionIsA();
 
-          // metroplis condition for simulated annealing compares meanRawA and meanRawB 
-          const metropolisCondition = currentFunctionIsA() ? Math.exp((meanrawA - meanrawB) / temperature) > Math.random() : Math.exp((meanrawB - meanrawA) / temperature) > Math.random();
+          // metroplis condition for simulated annealing
+          // use the relative improvement
+          // const metropolisCondition = currentFunctionIsA() ? Math.exp((meanrawA - meanrawB) / temperature) : Math.exp((meanrawB - meanrawA) / temperature);
+          const metropolisCondition = Math.exp((-absoluteImprovement) / temperature);
+
+          Logger.dev(`metropolis condition: ${metropolisCondition}`);
+
+          // todo: measure the improvement in relative to the baseline, no absolute values
 
           
           if (
-            mutatedIsBetter ||
-            (this.args.optimizer === "SA" && metropolisCondition)
+            mutatedIsBetter
           ) {
             Logger.log("kept    mutation");
             kept = true;
@@ -299,9 +340,21 @@ export class Optimizer {
             this.revertFunction();
           }
 
-          // Simulated Annealing
-          // Decrease temperature
-          temperature -= coolingRate * temperature;
+          // Simulated Annealing: Temperature Updates (temperature length, temperature restart, cooling scheme)
+          // if (this.args.optimizer === "SA") {
+          //   // Temperature Length
+          //   // update temperature when using SA and we evaluated a batch
+          //   if (numEvals % beta === 0) {
+          //     // Decrease temperature
+          //     temperature = (alpha^numEvals) * temperature;
+          //   }
+
+          //   // Temperature Restart
+          //   // if (temperature < 0.0001) {
+          //   //   Logger.dev("Temperature Restart");
+          //   //   temperature = initialTemperature;
+          //   // }
+          // }
 
           // Logger.dev(`temperature: ${temperature}`);
           
@@ -324,6 +377,15 @@ export class Optimizer {
           }
 
           logMutation({ choice, kept, numEvals });
+          // Logger.dev(`highest absolute improvement: ${highestAbsoluteImprovement}`);
+          // //calc median of improvements
+          // improvementsList.sort((a, b) => a - b);
+          // improvementMedian = improvementsList[Math.floor(improvementsList.length / 2)];
+          // Logger.dev(`improvement median: ${improvementMedian}`);
+
+          // // calc average of improvements
+          // improvementAverage = improvementsList.reduce((a, b) => a + b, 0) / improvementsList.length;
+          // Logger.dev(`improvement average: ${improvementAverage}`);
           if (numEvals % PRINT_EVERY == 0) {
             // print every 10th eval
             // a line every 5% (also to logfile) also write the asm when
