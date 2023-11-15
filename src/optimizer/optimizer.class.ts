@@ -145,25 +145,24 @@ export class Optimizer {
       let ratioString = "";
       let numEvals = 0;
 
-      // Simulated Annealing
-      // BR1
-      // θ′ = (k = 8.979, β = 51, α = 0.9163, γ = 83)
-      // const k = 8.979;
-      // const beta = 51;
-      // const gamma = 83;
-      // const alpha = 0.9163;
+      let currentBestResult: AnalyseResult | undefined;
 
       // balanced initial temperature = -(AVERAGE_DELTA/(ln(ACCEPTANCE_RATE)))
       const initialTemperature = -(
         180 /
         Math.log(0.8)
       );
-
-      Logger.dev(`initial temperature: ${initialTemperature}`)
-
-      // BR1 set max gap fixed for now
-      // const initialTemperature = 200 * k;
+      Logger.dev(`initial temperature: ${initialTemperature}`);
       let temperature = initialTemperature;
+
+      // geometric cooling scheme
+      // constant alpha for temperature cooling scheme
+      const alpha = 0.95;
+      const beta = 0.95;
+
+      // temperature length
+      // fixed number of evaluations
+      const temperatureLengthEvals = 50;
 
       Logger.dev(`optimiser ${this.args.optimizer}`);
 
@@ -323,25 +322,37 @@ export class Optimizer {
           // metroplis condition for simulated annealing
           // use the relative improvement
           // const metropolisCondition = currentFunctionIsA() ? Math.exp((meanrawA - meanrawB) / temperature) : Math.exp((meanrawB - meanrawA) / temperature);
-          const metropolisConditionWorse = Math.exp((-absoluteImprovement) / temperature);
+          const metropolisCondition = Math.exp((-absoluteImprovement) / temperature);
 
-          // Logger.dev(`metropolis condition: ${metropolisConditionWorse}`);
+          const metropolisConditionWorse = metropolisCondition > Math.random();
 
-          // todo: measure the improvement in relative to the baseline, no absolute values
+          // Logger.dev(`metropolis condition: ${metropolisCondition}`);
+          // Logger.dev(`metropolis condition evaluated: ${metropolisConditionWorse}`);
+
+          // Logger.dev(`mutated is better: ${mutatedIsBetter}`);
+
 
           
           if (
-            mutatedIsBetter
+            mutatedIsBetter || // local random search
+            (this.args.optimizer === "SA" && metropolisConditionWorse) // simulated annealing
           ) {
-            Logger.log("kept    mutation");
+            // Logger.dev("kept    mutation");
             kept = true;
             currentNameOfTheFunctionThatHasTheMutation = toggleFUNCTIONS(
               currentNameOfTheFunctionThatHasTheMutation,
             );
 
+            const comparedWithBest = this.compareWithBest(batchSize, numBatches, currentNameOfTheFunctionThatHasTheMutation);
+
             // update the best function
-            if (this.compareWithBest(batchSize, numBatches, currentNameOfTheFunctionThatHasTheMutation)) {
+            if (comparedWithBest.mutatedFunctionIsBetter) {
               this.asmStrings[FUNCTIONS.F_BEST] = this.asmStrings[currentNameOfTheFunctionThatHasTheMutation];
+
+              currentBestResult = comparedWithBest.result;
+
+              const bestRatio = currentBestResult.rawMedian[2] / Math.min(currentBestResult.rawMedian[0], currentBestResult.rawMedian[1]);
+              Logger.dev(`New Best ratio: ${bestRatio}`);
             }
           } else {
             // revert
@@ -350,20 +361,15 @@ export class Optimizer {
           }
 
           // Simulated Annealing: Temperature Updates (temperature length, temperature restart, cooling scheme)
-          // if (this.args.optimizer === "SA") {
-          //   // Temperature Length
-          //   // update temperature when using SA and we evaluated a batch
-          //   if (numEvals % beta === 0) {
-          //     // Decrease temperature
-          //     temperature = (alpha^numEvals) * temperature;
-          //   }
-
-          //   // Temperature Restart
-          //   // if (temperature < 0.0001) {
-          //   //   Logger.dev("Temperature Restart");
-          //   //   temperature = initialTemperature;
-          //   // }
-          // }
+          if (this.args.optimizer === "SA") {
+            // Temperature Length
+            if (numEvals % temperatureLengthEvals === 0) {
+              // Decrease temperature
+              temperature = temperature * alpha;
+              
+              Logger.dev(`temperature: ${temperature}`);
+            }
+          }
 
           // Logger.dev(`temperature: ${temperature}`);
           
@@ -473,6 +479,10 @@ export class Optimizer {
             // writing the CSV
             writeString(mutationsCsvFile, globals.mutationLog.join("\n"));
 
+            // Output the ratio of the best function
+            const bestRatio = currentBestResult!.rawMedian[2] / Math.min(currentBestResult!.rawMedian[0], currentBestResult!.rawMedian[1]);
+            Logger.dev(`Best ratio: ${bestRatio}`);
+
             if (shouldProof(this.args)) {
               // and proof correct
               const proofCmd = FiatBridge.buildProofCommand(this.args.curve, this.args.method, asmFile);
@@ -513,10 +523,10 @@ export class Optimizer {
     }
   }
 
-  private compareWithBest(batchSize: number, numBatches: number, mutatedFunction: FUNCTIONS): boolean {
+  private compareWithBest(batchSize: number, numBatches: number, mutatedFunction: FUNCTIONS): {result: AnalyseResult, mutatedFunctionIsBetter: boolean} {
     let analyseResult: AnalyseResult | undefined;
     try {
-      Logger.dev("let the measurements against the best begin!");
+      // Logger.dev("let the measurements against the best begin!");
       if (this.args.verbose) {
         writeString(
           pathResolve(this.libcheckfunctionDirectory, mutatedFunction === FUNCTIONS.F_A ? "currentA.asm" : "currentB.asm"),
@@ -574,10 +584,10 @@ export class Optimizer {
     // we only want to return if the mutated function is better than the best
     const [meanrawA, meanrawBest, meanrawCheck] = analyseResult.rawMedian;
 
-    Logger.dev(`analyse Medians... mutated: ${meanrawA} best: ${meanrawBest} check: ${meanrawCheck}`);
+    // Logger.dev(`analyse Medians... mutated: ${meanrawA} best: ${meanrawBest} check: ${meanrawCheck}`);
 
     const mutatedFunctionIsBetter = meanrawA <= meanrawBest;
 
-    return mutatedFunctionIsBetter;
+    return {result: analyseResult, mutatedFunctionIsBetter};
   }
 }
