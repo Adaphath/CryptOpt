@@ -447,11 +447,10 @@ export class Optimizer {
             );
 
             // writing the CSV
-            writeString(mutationsCsvFile, globals.mutationLog.join("\n"));
-
-            // Output the ratio of the best function
-            const bestRatio = currentBestResult!.rawMedian[2] / Math.min(currentBestResult!.rawMedian[0], currentBestResult!.rawMedian[1]);
-            Logger.log(`Best ratio: ${bestRatio}`);
+            if (currentBestResult) {
+              const bestRatio = currentBestResult.rawMedian[2] / Math.min(currentBestResult.rawMedian[0], currentBestResult.rawMedian[1]);
+              Logger.log(`Best ratio: ${bestRatio}`);
+            }
 
             if (shouldProof(this.args)) {
               // and proof correct
