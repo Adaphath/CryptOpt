@@ -115,6 +115,20 @@ export class Model {
     m.backupbody();
   }
 
+  public static importFromStateObject(state: any) {
+    const { to, body, seed, convergence } = state;
+    const m = Model.getInstance();
+    Model._order = to;
+    Model._nodes = body;
+    Paul.seed = seed;
+    globals.convergence = convergence;
+    if ("time" in state) {
+      globals.time = state.time;
+    }
+    m._currentReadOrderIsValid = false;
+    m.backupbody();
+  }
+
   public static init({
     json,
     memoryConstraints,
