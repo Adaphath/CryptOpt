@@ -139,13 +139,13 @@ async function run(args: OptimizerArgs): Promise<RunResult> {
     process.exit(1000);
   }
   try {
-    await optimizer.optimise();
+    await optimizer!.optimise();
   } catch (e) {
     console.error(`CryptOpt-Error while optimising\n`, e);
     process.exit(1000);
   }
 
-  const [statefile] = generateResultFilename({ ...args, symbolname: optimizer.getSymbolname() });
+  const [statefile] = generateResultFilename({ ...args, symbolname: optimizer!.getSymbolname() });
   Model.persist(statefile, parsedArgs);
   const { ratio, convergence } = Model.getState();
   return { statefile, ratio, convergence };
