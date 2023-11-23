@@ -149,20 +149,28 @@ export class Optimizer {
 
       let currentBestResult: AnalyseResult | undefined;
 
+      // measurements
+      // collect all improvements to calculate the average, median and stddeviation
+      const improvements: number[] = [];
+
+      // collect all worse solutions accepted to calculate the average, median and stddeviation
+      const worsenings: number[] = [];
+
       // balanced initial temperature = -(AVERAGE_DELTA/(ln(ACCEPTANCE_RATE)))
-      const initialTemperature = -(
-        180 /
-        Math.log(0.99)
-      );
+      const k = 1;
+      const averageDelta = 190;
+      const acceptanceRate = 0.80;
+      const initialTemperature = Math.abs((k * averageDelta) / Math.log(acceptanceRate));
       Logger.dev(`initial temperature: ${initialTemperature}`);
       let temperature = initialTemperature;
 
       // geometric cooling scheme
       // constant alpha for temperature cooling scheme
-      const alpha = 0.96;
+      const alpha = 0.965;
       const beta = 0.95;
 
       // statistics for worse solutions accepted
+      let countWorseSolutions = 0;
       let countWorseSolutionsAccepted = 0;
       let nextEvaluationCheckpoint = Math.ceil(0.01 * this.args.evals);
       let worseSolutionStatistics: number[] = [];
@@ -173,7 +181,10 @@ export class Optimizer {
 
       // temperature length
       // fixed number of evaluations
-      const temperatureLengthEvals = 350;
+      const lengthConstant = 50 / 10000
+      const temperatureLengthEvals = Math.ceil(lengthConstant * this.args.evals);
+
+      Logger.dev(`temperature length: ${temperatureLengthEvals}`);
 
       const optimistaionStartDate = Date.now();
       let accumulatedTimeSpentByMeasuring = 0;
@@ -302,8 +313,6 @@ export class Optimizer {
           // first calculate the absolute improvement between the mutated and the function before
           const absoluteImprovement = currentFunctionIsA() ? meanrawA - meanrawB : meanrawB - meanrawA;
 
-
-
           // Compare the two functions
           // Local random search: if the new function is better, keep it.
           // Simulated Annealing: Acceptance Criterion -> Metropolis condition
@@ -311,21 +320,30 @@ export class Optimizer {
           // local random search compares meanRawA and meanRawB
           const mutatedIsBetter = meanrawA <= meanrawB && currentFunctionIsA() || meanrawA >= meanrawB && !currentFunctionIsA();
 
+          if (!mutatedIsBetter)
+            countWorseSolutions++;
+
+          // collect the improvements and worsenings
+          if (mutatedIsBetter)
+            improvements.push(absoluteImprovement);
+          else 
+            worsenings.push(absoluteImprovement);
+
           // metroplis condition for simulated annealing
           // use the relative improvement
           const metropolisCondition = Math.exp((-absoluteImprovement) / temperature);
 
-          const metropolisConditionWorse = metropolisCondition > Math.random();
+          const metropolis = mutatedIsBetter || metropolisCondition > Math.random();
           
           if (
-            mutatedIsBetter || // local random search
-            (this.args.optimizer === "SA" && metropolisConditionWorse) // simulated annealing
+            (this.args.optimizer === "LS"  && mutatedIsBetter) || // local random search
+            (this.args.optimizer === "SA" && metropolis) // simulated annealing
           ) {
             // worse function is kept because of metropolis condition
-            if (!mutatedIsBetter) {
-              Logger.log(`Kept worse function. Metropolis condition: ${metropolisCondition}`);
-              Logger.log(`absolute improvement: ${absoluteImprovement}`);
-              Logger.log(`Current temperature: ${temperature}`);
+            if (this.args.optimizer === "SA" && metropolis && !mutatedIsBetter) {
+              // Logger.dev(`Kept worse function. Metropolis condition: ${metropolisCondition}`);
+              // Logger.dev(`absolute improvement: ${absoluteImprovement}`);
+              // Logger.dev(`Current temperature: ${temperature}`);
 
               // increase the number of worse solutions accepted
               countWorseSolutionsAccepted++;
@@ -367,14 +385,22 @@ export class Optimizer {
 
           // if checkpoint for worse solutions accepted is reached
           if (numEvals >= nextEvaluationCheckpoint) {
-            worseSolutionStatistics.push(countWorseSolutionsAccepted);
+            // worseSolutionStatistics.push(countWorseSolutionsAccepted);
+
+            // calculate the ratio
+            const ratio = countWorseSolutionsAccepted / countWorseSolutions;
+
+            // push the ratio
+            worseSolutionStatistics.push(ratio);
+
             currentRatioStatistics.push({
               x: numEvals,
               y: globals.currentRatio
             });
 
-            // reset the number of worse solutions accepted
+            // reset the number of worse solutions accepted and the number of worse solutions
             countWorseSolutionsAccepted = 0;
+            countWorseSolutions = 0;
 
             // increase the checkpoint
             nextEvaluationCheckpoint += Math.ceil(0.01 * this.args.evals);
@@ -483,7 +509,7 @@ export class Optimizer {
             const myChart = new ChartJsImage();
 
             const labels = [];
-            for (let i = 1; i <= 50; i++) {
+            for (let i = 1; i <= 100; i++) {
               labels.push(Math.ceil(i*0.01*this.args.evals));
             }
             myChart.setConfig({
@@ -521,7 +547,9 @@ export class Optimizer {
                     "id": "y",
                     "type": "linear",
                     "display": true,
-                    "position": "left"
+                    "position": "left",
+                    "suggestedMax": 1,
+                    "suggestedMin": 0
                   }, 
                   {
                     "id": "y1",
@@ -549,6 +577,44 @@ export class Optimizer {
             }
 
             myChart.toFile(chartPath);
+
+            // print improvement statistics
+            // Calculate the average
+            let sum = improvements.reduce((a, b) => a + b, 0);
+            let avg = sum / improvements.length;
+
+            // Calculate the median
+            let sorted = [...improvements].sort((a, b) => a - b);
+            let mid = Math.floor(sorted.length / 2);
+            let median = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+
+            // Calculate the standard deviation
+            let squareDiffs = improvements.map(value => (value - avg) ** 2);
+            let avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / squareDiffs.length;
+            let stdDev = Math.sqrt(avgSquareDiff);
+
+            Logger.dev(`Improvements Average: ${avg}`);
+            Logger.dev(`Improvements Median: ${median}`);
+            Logger.dev(`Improvements Standard Deviation: ${stdDev}`);
+
+            // print worsening statistics
+            // Calculate the average
+            let sumWorsenings = worsenings.reduce((a, b) => a + b, 0);
+            let avgWorsenings = sumWorsenings / worsenings.length;
+
+            // Calculate the median
+            let sortedWorsenings = [...worsenings].sort((a, b) => a - b);
+            let midWorsenings = Math.floor(sortedWorsenings.length / 2);
+            let medianWorsenings = sortedWorsenings.length % 2 !== 0 ? sortedWorsenings[midWorsenings] : (sortedWorsenings[midWorsenings - 1] + sortedWorsenings[midWorsenings]) / 2;
+
+            // Calculate the standard deviation
+            let squareDiffsWorsenings = worsenings.map(value => (value - avgWorsenings) ** 2);
+            let avgSquareDiffWorsenings = squareDiffsWorsenings.reduce((a, b) => a + b, 0) / squareDiffsWorsenings.length;
+            let stdDevWorsenings = Math.sqrt(avgSquareDiffWorsenings);
+
+            Logger.dev(`Worsenings Average: ${avgWorsenings}`);
+            Logger.dev(`Worsenings Median: ${medianWorsenings}`);
+            Logger.dev(`Worsenings Standard Deviation: ${stdDevWorsenings}`);
 
             // writing the CSV
             if (currentBestResult) {
