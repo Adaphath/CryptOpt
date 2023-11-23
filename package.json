@@ -46,6 +46,7 @@
     "yargs": "^17.7.2"
   },
   "devDependencies": {
+    "chartjs-to-image": "^1.2.2",
     "@rollup/plugin-strip": "^3.0.2",
     "@rollup/plugin-terser": "^0.4.3",
     "@rollup/plugin-typescript": "^11.1.2",

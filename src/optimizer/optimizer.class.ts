@@ -20,6 +20,8 @@ import { Measuresuite } from "measuresuite";
 import { tmpdir } from "os";
 import { join, resolve as pathResolve } from "path";
 
+import ChartJsImage from 'chartjs-to-image';
+
 import { assemble } from "@/assembler";
 import { FiatBridge } from "@/bridge/fiat-bridge";
 import { CHOICE, FUNCTIONS } from "@/enums";
@@ -150,19 +152,28 @@ export class Optimizer {
       // balanced initial temperature = -(AVERAGE_DELTA/(ln(ACCEPTANCE_RATE)))
       const initialTemperature = -(
         180 /
-        Math.log(0.7)
+        Math.log(0.99)
       );
-      Logger.log(`initial temperature: ${initialTemperature}`);
+      Logger.dev(`initial temperature: ${initialTemperature}`);
       let temperature = initialTemperature;
 
       // geometric cooling scheme
       // constant alpha for temperature cooling scheme
-      const alpha = 0.95;
+      const alpha = 0.96;
       const beta = 0.95;
+
+      // statistics for worse solutions accepted
+      let countWorseSolutionsAccepted = 0;
+      let nextEvaluationCheckpoint = Math.ceil(0.01 * this.args.evals);
+      let worseSolutionStatistics: number[] = [];
+      let currentRatioStatistics: {
+        x: number;
+        y: number;
+      }[] = [];
 
       // temperature length
       // fixed number of evaluations
-      const temperatureLengthEvals = 50;
+      const temperatureLengthEvals = 350;
 
       const optimistaionStartDate = Date.now();
       let accumulatedTimeSpentByMeasuring = 0;
@@ -315,6 +326,9 @@ export class Optimizer {
               Logger.log(`Kept worse function. Metropolis condition: ${metropolisCondition}`);
               Logger.log(`absolute improvement: ${absoluteImprovement}`);
               Logger.log(`Current temperature: ${temperature}`);
+
+              // increase the number of worse solutions accepted
+              countWorseSolutionsAccepted++;
             }
             kept = true;
             currentNameOfTheFunctionThatHasTheMutation = toggleFUNCTIONS(
@@ -350,6 +364,23 @@ export class Optimizer {
           }
 
           // Logger.dev(`temperature: ${temperature}`);
+
+          // if checkpoint for worse solutions accepted is reached
+          if (numEvals >= nextEvaluationCheckpoint) {
+            worseSolutionStatistics.push(countWorseSolutionsAccepted);
+            currentRatioStatistics.push({
+              x: numEvals,
+              y: globals.currentRatio
+            });
+
+            // reset the number of worse solutions accepted
+            countWorseSolutionsAccepted = 0;
+
+            // increase the checkpoint
+            nextEvaluationCheckpoint += Math.ceil(0.01 * this.args.evals);
+          }
+
+          
           
           const indexGood = Number(meanrawA > meanrawB);
           const indexBad = 1 - indexGood;
@@ -407,7 +438,7 @@ export class Optimizer {
             globals.time.generateCryptopt =
               (Date.now() - optimistaionStartDate) / 1000 - globals.time.validate;
             clearInterval(intervalHandle);
-
+ 
             Logger.log("writing current asm");
             const elapsed = Date.now() - optimistaionStartDate;
             const paddedSeed = padSeed(Paul.initialSeed);
@@ -446,10 +477,83 @@ export class Optimizer {
                 .join("\n"),
             );
 
+            // write optimization statistics
+            Logger.log(`Worse solution statistics: ${worseSolutionStatistics}`);
+
+            const myChart = new ChartJsImage();
+
+            const labels = [];
+            for (let i = 1; i <= 50; i++) {
+              labels.push(Math.ceil(i*0.01*this.args.evals));
+            }
+            myChart.setConfig({
+              type: 'line',
+              data: {
+                labels: labels,
+                datasets: [{
+                  label: 'Number of worse solutions accepted',
+                  data: worseSolutionStatistics,
+                  fill: false,
+                  tension: 0.5,
+                  type: 'line',
+                  yAxisID: 'y'
+                },
+                {
+                  label: 'Current ratio',
+                  data: currentRatioStatistics,
+                  fill: false,
+                  tension: 0.5,
+                  type: 'scatter',
+                  yAxisID: 'y1'
+                }]
+              },
+              options: {
+                stacked: true,
+                plugins: {
+                  title: {
+                    display: true,
+                    text: 'Chart.js Line Chart - Multi Axis'
+                  }
+                },
+                "scales": {
+                  "yAxes": [
+                  {
+                    "id": "y",
+                    "type": "linear",
+                    "display": true,
+                    "position": "left"
+                  }, 
+                  {
+                    "id": "y1",
+                    "type": "linear",
+                    "display": true,
+                    "position": "right",
+                    "gridLines": {
+                      "drawOnChartArea": false
+                    }
+                  }
+                  ]
+                }
+              }
+            });
+            let chartPath = '';
+
+            // format timestamp to be used in chart name
+            const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\./g, '-');
+
+
+            if (this.args.optimizer === "SA") {
+              chartPath = `./results/${timestamp}_${this.args.optimizer}_chart_${initialTemperature}_${alpha}_${temperatureLengthEvals}.png`;
+            } else if (this.args.optimizer === "LS") {
+              chartPath = `./results/${timestamp}_${this.args.optimizer}_chart.png`;
+            }
+
+            myChart.toFile(chartPath);
+
             // writing the CSV
             if (currentBestResult) {
               const bestRatio = currentBestResult.rawMedian[2] / Math.min(currentBestResult.rawMedian[0], currentBestResult.rawMedian[1]);
-              Logger.log(`Best ratio: ${bestRatio}`);
+              Logger.dev(`Best ratio: ${bestRatio}`);
             }
 
             if (shouldProof(this.args)) {

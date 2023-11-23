@@ -14,6 +14,7 @@ const external = [
   "process",
   "proper-lockfile",
   "simple-statistics",
+  "chartjs-to-image",
   "url",
   "yargs",
   "yargs/helpers",
