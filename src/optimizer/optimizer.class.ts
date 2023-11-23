@@ -41,7 +41,7 @@ import Logger from "@/helper/Logger.class";
 import { Model } from "@/model";
 import { Paul, sha1Hash } from "@/paul";
 import { RegisterAllocator } from "@/registerAllocator";
-import type { AnalyseResult, OptimizerArgs } from "@/types";
+import { AdaptiveTemperatureLength, AdaptiveTemperatureLengthT, AnalyseResult, OptimizerArgs } from "@/types";
 
 import { genStatistics, genStatusLine, logMutation, printStartInfo } from "./optimizer.helper";
 import { init } from "./optimizer.helper.class";
@@ -159,15 +159,14 @@ export class Optimizer {
       // balanced initial temperature = -(AVERAGE_DELTA/(ln(ACCEPTANCE_RATE)))
       const k = 1;
       const averageDelta = 190;
-      const acceptanceRate = 0.80;
+      const acceptanceRate = 0.85;
       const initialTemperature = Math.abs((k * averageDelta) / Math.log(acceptanceRate));
       Logger.dev(`initial temperature: ${initialTemperature}`);
       let temperature = initialTemperature;
 
       // geometric cooling scheme
       // constant alpha for temperature cooling scheme
-      const alpha = 0.965;
-      const beta = 0.95;
+      const alpha = 0.92;
 
       // statistics for worse solutions accepted
       let countWorseSolutions = 0;
@@ -178,11 +177,21 @@ export class Optimizer {
         x: number;
         y: number;
       }[] = [];
-
+      
       // temperature length
       // fixed number of evaluations
+      const temperatureLengthType: string = 'TL7';
       const lengthConstant = 50 / 10000
       const temperatureLengthEvals = Math.ceil(lengthConstant * this.args.evals);
+
+      // adaptive temperature length (TL6) -> reduce temperature when a certain threshold of accepted solutions is reached
+      const threshholdOfAcceptedSolutions = 100;
+      let numberOfAcceptedSolutions = 0;
+
+      // adaptive temperature length -> reduce temperature if the last x solutions were worse
+      const checkLastIterations = 5;
+      let improvementsInLastIterations: boolean[] = [];
+
 
       Logger.dev(`temperature length: ${temperatureLengthEvals}`);
 
@@ -323,6 +332,9 @@ export class Optimizer {
           if (!mutatedIsBetter)
             countWorseSolutions++;
 
+          // adaptive temperature length -> reduce temperature if the last x solutions were worse
+          improvementsInLastIterations.push(mutatedIsBetter);
+
           // collect the improvements and worsenings
           if (mutatedIsBetter)
             improvements.push(absoluteImprovement);
@@ -373,11 +385,42 @@ export class Optimizer {
           // Simulated Annealing: Temperature Updates (temperature length, temperature restart, cooling scheme)
           if (this.args.optimizer === "SA") {
             // Temperature Length
-            if (numEvals % temperatureLengthEvals === 0) {
+            // fixed number of evaluations
+            if (temperatureLengthType === 'TL1' && numEvals % temperatureLengthEvals === 0) {
               // Decrease temperature
               temperature = temperature * alpha;
               
               Logger.log(`New temperature: ${temperature}`);
+            }
+
+            // adaptive temperature length (TL6)
+            if (temperatureLengthType === 'TL6' && kept) {
+              // increase the number of accepted solutions
+              numberOfAcceptedSolutions++;
+            }
+            if (temperatureLengthType === 'TL6' && numberOfAcceptedSolutions >= threshholdOfAcceptedSolutions) {
+              // Decrease temperature
+              temperature = temperature * alpha;
+              
+              Logger.dev(`New temperature: ${temperature}`);
+
+              // reset the number of accepted solutions
+              numberOfAcceptedSolutions = 0;
+            }
+
+            if (temperatureLengthType === 'TL7') {
+              // check if the list of improvements is larger than the checkLastIterations
+              if (improvementsInLastIterations.length > checkLastIterations) {
+                if (improvementsInLastIterations.every(value => !value)) {
+                  // Decrease temperature
+                  temperature = temperature * alpha;
+                  
+                  Logger.dev(`New temperature: ${temperature}`);
+                }
+
+                // reset the list of improvements
+                improvementsInLastIterations = [];
+              }
             }
           }
 
@@ -571,7 +614,7 @@ export class Optimizer {
 
 
             if (this.args.optimizer === "SA") {
-              chartPath = `./results/${timestamp}_${this.args.optimizer}_chart_${initialTemperature}_${alpha}_${temperatureLengthEvals}.png`;
+              chartPath = `./results/${timestamp}_${this.args.optimizer}_chart_adapttemp_${initialTemperature}_${alpha}_${threshholdOfAcceptedSolutions}.png`;
             } else if (this.args.optimizer === "LS") {
               chartPath = `./results/${timestamp}_${this.args.optimizer}_chart.png`;
             }
