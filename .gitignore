@@ -1,7 +1,8 @@
 node_modules
 dist
 bins
-results*
+results/*
+!results/*.png
 coverage
 .cache
 .vscode
