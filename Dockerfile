@@ -33,7 +33,7 @@ RUN curl -L https://github.com/0xADE1A1DE/AssemblyLine/releases/download/v${asml
         ldconfig
 
 # get and install CryptOpt
-RUN git clone --jobs 3 --recurse-submodules  https://github.com/0xADE1A1DE/CryptOpt /root/CryptOpt
+RUN git clone --jobs 3 --recurse-submodules  https://github.com/Adaphath/CryptOpt /root/CryptOpt
 RUN cd /root/CryptOpt && \
         git checkout --recurse-submodules main && \
         make && \
