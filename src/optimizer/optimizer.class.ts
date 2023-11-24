@@ -41,7 +41,7 @@ import Logger from "@/helper/Logger.class";
 import { Model } from "@/model";
 import { Paul, sha1Hash } from "@/paul";
 import { RegisterAllocator } from "@/registerAllocator";
-import { AdaptiveTemperatureLength, AdaptiveTemperatureLengthT, AnalyseResult, OptimizerArgs } from "@/types";
+import { AnalyseResult, OptimizerArgs } from "@/types";
 
 import { genStatistics, genStatusLine, logMutation, printStartInfo } from "./optimizer.helper";
 import { init } from "./optimizer.helper.class";
