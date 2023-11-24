@@ -85,7 +85,6 @@ export class Optimizer {
   private asmStrings: { [k in FUNCTIONS]: string } = {
     [FUNCTIONS.F_A]: "",
     [FUNCTIONS.F_B]: "",
-    [FUNCTIONS.F_BEST]: "",
   };
   private numMut: { [id: string]: number } = {
     permutation: 0,
@@ -147,8 +146,6 @@ export class Optimizer {
       let ratioString = "";
       let numEvals = 0;
 
-      let currentBestResult: AnalyseResult | undefined;
-
       // measurements
       // collect all improvements to calculate the average, median and stddeviation
       const improvements: number[] = [];
@@ -188,7 +185,7 @@ export class Optimizer {
       const threshholdOfAcceptedSolutions = 100;
       let numberOfAcceptedSolutions = 0;
 
-      // adaptive temperature length -> reduce temperature if the last x solutions were worse
+      // adaptive temperature length (TL7) -> reduce temperature if the last x solutions were worse
       const checkLastIterations = 5;
       let improvementsInLastIterations: boolean[] = [];
 
@@ -227,16 +224,12 @@ export class Optimizer {
 
         // check if this was the first round
         if (numEvals == 0) {
-          // set the best function to the first one
-          this.asmStrings[FUNCTIONS.F_BEST] = this.asmStrings[FUNCTIONS.F_A];
 
           // then point to fB and continue, write first
           if (this.asmStrings[FUNCTIONS.F_A].includes("undefined")) {
             const p = pathResolve(this.libcheckfunctionDirectory, "with_undefined.asm");
             writeString(p, this.asmStrings[FUNCTIONS.F_A]);
 
-            // set the best function to the undefined one
-            this.asmStrings[FUNCTIONS.F_BEST] = this.asmStrings[FUNCTIONS.F_A];
 
             const e = `\n\n\nNah... we dont want undefined; wrote ${p}, plx fix. \n\n\n`;
             console.error(e);
@@ -327,7 +320,8 @@ export class Optimizer {
           // Simulated Annealing: Acceptance Criterion -> Metropolis condition
 
           // local random search compares meanRawA and meanRawB
-          const mutatedIsBetter = meanrawA <= meanrawB && currentFunctionIsA() || meanrawA >= meanrawB && !currentFunctionIsA();
+          const mutatedIsBetter = (meanrawA <= meanrawB && currentFunctionIsA()) || (meanrawA >= meanrawB && !currentFunctionIsA());
+
 
           if (!mutatedIsBetter)
             countWorseSolutions++;
@@ -364,18 +358,6 @@ export class Optimizer {
             currentNameOfTheFunctionThatHasTheMutation = toggleFUNCTIONS(
               currentNameOfTheFunctionThatHasTheMutation,
             );
-
-            const comparedWithBest = this.compareWithBest(batchSize, numBatches, currentNameOfTheFunctionThatHasTheMutation);
-
-            // update the best function
-            if (comparedWithBest.mutatedFunctionIsBetter) {
-              this.asmStrings[FUNCTIONS.F_BEST] = this.asmStrings[currentNameOfTheFunctionThatHasTheMutation];
-
-              currentBestResult = comparedWithBest.result;
-
-              const bestRatio = currentBestResult.rawMedian[2] / Math.min(currentBestResult.rawMedian[0], currentBestResult.rawMedian[1]);
-              Logger.log(`New Best ratio: ${bestRatio}`);
-            }
           } else {
             // revert
             kept = false;
@@ -659,12 +641,6 @@ export class Optimizer {
             Logger.dev(`Worsenings Median: ${medianWorsenings}`);
             Logger.dev(`Worsenings Standard Deviation: ${stdDevWorsenings}`);
 
-            // writing the CSV
-            if (currentBestResult) {
-              const bestRatio = currentBestResult.rawMedian[2] / Math.min(currentBestResult.rawMedian[0], currentBestResult.rawMedian[1]);
-              Logger.dev(`Best ratio: ${bestRatio}`);
-            }
-
             if (shouldProof(this.args)) {
               // and proof correct
               const proofCmd = FiatBridge.buildProofCommand(this.args.curve, this.args.method, asmFile);
@@ -703,73 +679,5 @@ export class Optimizer {
         throw e;
       }
     }
-  }
-
-  private compareWithBest(batchSize: number, numBatches: number, mutatedFunction: FUNCTIONS): {result: AnalyseResult, mutatedFunctionIsBetter: boolean} {
-    let analyseResult: AnalyseResult | undefined;
-    try {
-      // Logger.dev("let the measurements against the best begin!");
-      if (this.args.verbose) {
-        writeString(
-          pathResolve(this.libcheckfunctionDirectory, mutatedFunction === FUNCTIONS.F_A ? "currentA.asm" : "currentB.asm"),
-          this.asmStrings[mutatedFunction],
-        );
-        writeString(
-          pathResolve(this.libcheckfunctionDirectory, "currentBest.asm"),
-          this.asmStrings[FUNCTIONS.F_BEST],
-        );
-      }
-      // here we need the barriers
-      const results = this.measuresuite.measure(batchSize, numBatches, [
-        this.asmStrings[mutatedFunction],
-        this.asmStrings[FUNCTIONS.F_BEST],
-      ]);
-      Logger.log("well done guys. The results are in!");
-
-      // accumulatedTimeSpentByMeasuring += Date.now() - now_measure;
-
-      analyseResult = analyseMeasureResult(results, { batchSize, resultDir: this.args.resultDir });
-
-      //TODO increase numBatches, if the times have a big stddeviation
-      //TODO change batchSize if the avg number is batchSize *= avg(times)/goal ; goal=10000 cycles
-    } catch (e) {
-      const isIncorrect = e instanceof Error && e.message.includes("tested_incorrect");
-      const isInvalid = e instanceof Error && e.message.includes("could not be assembled");
-      if (isInvalid || isIncorrect) {
-        writeString(
-          join(this.args.resultDir, mutatedFunction === FUNCTIONS.F_A ? "tested_incorrect_A.asm" : "tested_incorrect_B.asm"),
-          this.asmStrings[mutatedFunction],
-        );
-        writeString(
-          join(this.args.resultDir, "tested_incorrect_Best.asm"),
-          this.asmStrings[FUNCTIONS.F_BEST],
-        );
-        writeString(
-          join(this.args.resultDir, "tested_incorrect.json"),
-          JSON.stringify({
-            nodes: Model.nodesInTopologicalOrder,
-          }),
-        );
-      }
-
-      if (isIncorrect) {
-        errorOut(ERRORS.measureIncorrect);
-      }
-      if (isInvalid) {
-        errorOut(ERRORS.measureInvalid);
-      }
-      writeString(join(this.args.resultDir, mutatedFunction === FUNCTIONS.F_A ? "generic_error_A.asm" : "generic_error_B.asm"), this.asmStrings[mutatedFunction]);
-      writeString(join(this.args.resultDir, "generic_error_Best.asm"), this.asmStrings[FUNCTIONS.F_BEST]);
-      errorOut(ERRORS.measureGeneric);
-    }
-
-    // we only want to return if the mutated function is better than the best
-    const [meanrawA, meanrawBest, meanrawCheck] = analyseResult.rawMedian;
-
-    // Logger.dev(`analyse Medians... mutated: ${meanrawA} best: ${meanrawBest} check: ${meanrawCheck}`);
-
-    const mutatedFunctionIsBetter = meanrawA <= meanrawBest;
-
-    return {result: analyseResult, mutatedFunctionIsBetter};
   }
 }
