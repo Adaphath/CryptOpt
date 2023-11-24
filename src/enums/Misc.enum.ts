@@ -17,7 +17,6 @@
 export enum FUNCTIONS {
   F_A = "function_A",
   F_B = "function_B",
-  F_BEST = "function_BEST",
 }
 export enum CHOICE {
   PERMUTE = " P",
