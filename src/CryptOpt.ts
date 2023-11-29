@@ -113,14 +113,14 @@ async function allBets(evals: number, bets: number): Promise<RunResult[]> {
       logComment: `${parsedArgs.logComment} ${i}/${bets}`,
       seed: derivedSeed,
     };
-    Logger.dev("running a bet with " + JSON.stringify(args, undefined, 2));
+    Logger.log("running a bet with " + JSON.stringify(args, undefined, 2));
     const runResult = await run(args);
     runRes.push(runResult);
   }
 
   runRes.sort((a, b) => b.ratio - a.ratio); // note: reverse sort
 
-  Logger.dev(
+  Logger.log(
     [
       `Done finding good SEEEDs.`,
       `Starting final optimisation now.`,
@@ -139,13 +139,13 @@ async function run(args: OptimizerArgs): Promise<RunResult> {
     process.exit(1000);
   }
   try {
-    await optimizer!.optimise();
+    await optimizer.optimise();
   } catch (e) {
     console.error(`CryptOpt-Error while optimising\n`, e);
     process.exit(1000);
   }
 
-  const [statefile] = generateResultFilename({ ...args, symbolname: optimizer!.getSymbolname() });
+  const [statefile] = generateResultFilename({ ...args, symbolname: optimizer.getSymbolname() });
   Model.persist(statefile, parsedArgs);
   const { ratio, convergence } = Model.getState();
   return { statefile, ratio, convergence };
