@@ -63,7 +63,7 @@ export class Optimizer {
     Paul.seed = args.seed;
 
     const randomString = sha1Hash(Math.ceil(Date.now() * Math.random())).toString(36);
-    this.libcheckfunctionDirectory = join(tmpdir(), "CryptOpt.cache", randomString);
+    this.libcheckfunctionDirectory = join(tmpdir(), "CryptOpt.cache.ttest", randomString);
 
     const { measuresuite, symbolname } = init(this.libcheckfunctionDirectory, args);
 
@@ -163,7 +163,7 @@ export class Optimizer {
 
       // geometric cooling scheme
       // constant alpha for temperature cooling scheme
-      const alpha = 0.92;
+      const alpha = 0.97;
 
       // statistics for worse solutions accepted
       let countWorseSolutions = 0;
@@ -177,7 +177,7 @@ export class Optimizer {
       
       // temperature length
       // fixed number of evaluations
-      const temperatureLengthType: string = 'TL7';
+      const temperatureLengthType: string = 'TL6';
       const lengthConstant = 50 / 10000
       const temperatureLengthEvals = Math.ceil(lengthConstant * this.args.evals);
 
@@ -198,8 +198,9 @@ export class Optimizer {
 
       let currentNameOfTheFunctionThatHasTheMutation = FUNCTIONS.F_A;
       let time = Date.now();
+      const startTime = new Date();
       let show_per_second = "many/s";
-      let per_second_counter = 0; 
+      let per_second_counter = 0;
       const intervalHandle = setInterval(() => {
         if (numEvals > 0) {
           // not first eval, thus we want to mutate.
@@ -315,6 +316,7 @@ export class Optimizer {
           // first calculate the absolute improvement between the mutated and the function before
           const absoluteImprovement = currentFunctionIsA() ? meanrawA - meanrawB : meanrawB - meanrawA;
 
+
           // Compare the two functions
           // Local random search: if the new function is better, keep it.
           // Simulated Annealing: Acceptance Criterion -> Metropolis condition
@@ -366,6 +368,7 @@ export class Optimizer {
 
           // Simulated Annealing: Temperature Updates (temperature length, temperature restart, cooling scheme)
           if (this.args.optimizer === "SA") {
+            Logger.log(`temperature: ${temperature}`);
             // Temperature Length
             // fixed number of evaluations
             if (temperatureLengthType === 'TL1' && numEvals % temperatureLengthEvals === 0) {
@@ -406,7 +409,6 @@ export class Optimizer {
             }
           }
 
-          // Logger.dev(`temperature: ${temperature}`);
 
           // if checkpoint for worse solutions accepted is reached
           if (numEvals >= nextEvaluationCheckpoint) {
@@ -451,7 +453,9 @@ export class Optimizer {
             per_second_counter = 0;
           }
 
+
           logMutation({ choice, kept, numEvals });
+
 
           if (numEvals % PRINT_EVERY == 0) {
             // print every 10th eval
@@ -531,12 +535,22 @@ export class Optimizer {
             // write optimization statistics
             Logger.log(`Worse solution statistics: ${worseSolutionStatistics}`);
 
+            // format timestamp to be used in chart name
+            const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\./g, '-');
+
+            const endTime = new Date();
+
+            const timeDiff: string = this.formatDateDiff(startTime, endTime);
+
             const myChart = new ChartJsImage();
 
             const labels = [];
             for (let i = 1; i <= 100; i++) {
               labels.push(Math.ceil(i*0.01*this.args.evals));
             }
+            myChart.setFormat('svg');
+            myChart.setWidth('1280');
+            myChart.setHeight('720');
             myChart.setConfig({
               type: 'line',
               data: {
@@ -560,11 +574,10 @@ export class Optimizer {
               },
               options: {
                 stacked: true,
-                plugins: {
-                  title: {
-                    display: true,
-                    text: 'Chart.js Line Chart - Multi Axis'
-                  }
+                title: {
+                  display: true,
+                  text: this.args.optimizer === 'SA' ? `${new Date().toLocaleDateString()} Evals: ${this.args.evals} Opt:${this.args.optimizer} ${temperatureLengthType} Seed: ${this.args.seed} Total time: ${timeDiff} Init tmp: ${initialTemperature} Alpha: ${alpha} Threshold (?): ${threshholdOfAcceptedSolutions}` : 
+                  `${new Date().toLocaleDateString()} Evals: ${this.args.evals} Opt:${this.args.optimizer} Seed: ${this.args.seed} Total time: ${timeDiff}`
                 },
                 "scales": {
                   "yAxes": [
@@ -591,18 +604,23 @@ export class Optimizer {
             });
             let chartPath = '';
 
-            // format timestamp to be used in chart name
-            const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\./g, '-');
-
 
             if (this.args.optimizer === "SA") {
-              chartPath = `./results/${timestamp}_${this.args.optimizer}_chart_adapttemp_${initialTemperature}_${alpha}_${threshholdOfAcceptedSolutions}.png`;
+              chartPath = `./results/${timestamp}_${this.args.optimizer}_${temperatureLengthType}_${this.args.seed}_chart_adapttemp_${initialTemperature}_${alpha}_${threshholdOfAcceptedSolutions}.svg`;
             } else if (this.args.optimizer === "LS") {
-              chartPath = `./results/${timestamp}_${this.args.optimizer}_chart.png`;
+              chartPath = `./results/${timestamp}_${this.args.optimizer}_${this.args.seed}_chart.svg`;
             }
 
-            myChart.toFile(chartPath);
-
+            Logger.dev(this.args.logComment);
+            if (this.args.logComment === ' run') {
+              Logger.dev('will create charts')
+              myChart.toFile(chartPath).then(() => {
+                console.log('created chart successfully');
+              }).catch(e => {
+                console.error('Mothertrucking charts...');
+                console.error(e);
+              }); 
+            }
             // print improvement statistics
             // Calculate the average
             let sum = improvements.reduce((a, b) => a + b, 0);
@@ -667,6 +685,17 @@ export class Optimizer {
       }, 0);
     });
   }
+
+  private formatDateDiff(date1: Date, date2: Date): string {
+    const diff = Math.abs(date1.getTime() - date2.getTime());
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+    const minutes = Math.floor((diff / 1000 / 60) % 60);
+    const seconds = Math.floor((diff / 1000) % 60);
+
+    return `${days} days, ${hours} hours, ${minutes} minutes, ${seconds} seconds`;
+}
 
   private cleanLibcheckfunctions() {
     if (existsSync(this.libcheckfunctionDirectory)) {
