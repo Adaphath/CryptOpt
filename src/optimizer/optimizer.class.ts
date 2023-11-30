@@ -156,14 +156,14 @@ export class Optimizer {
       // balanced initial temperature = -(AVERAGE_DELTA/(ln(ACCEPTANCE_RATE)))
       const k = 1;
       const averageDelta = 190;
-      const acceptanceRate = 0.85;
+      const acceptanceRate = 0.80;
       const initialTemperature = Math.abs((k * averageDelta) / Math.log(acceptanceRate));
       Logger.dev(`initial temperature: ${initialTemperature}`);
       let temperature = initialTemperature;
 
       // geometric cooling scheme
       // constant alpha for temperature cooling scheme
-      const alpha = 0.97;
+      const alpha = 0.95;
 
       // statistics for worse solutions accepted
       let countWorseSolutions = 0;
@@ -177,7 +177,7 @@ export class Optimizer {
       
       // temperature length
       // fixed number of evaluations
-      const temperatureLengthType: string = 'TL6';
+      const temperatureLengthType: string = 'TL1';
       const lengthConstant = 50 / 10000
       const temperatureLengthEvals = Math.ceil(lengthConstant * this.args.evals);
 
@@ -375,7 +375,7 @@ export class Optimizer {
               // Decrease temperature
               temperature = temperature * alpha;
               
-              Logger.log(`New temperature: ${temperature}`);
+              Logger.dev(`New temperature: ${temperature}`);
             }
 
             // adaptive temperature length (TL6)
@@ -548,6 +548,7 @@ export class Optimizer {
             for (let i = 1; i <= 100; i++) {
               labels.push(Math.ceil(i*0.01*this.args.evals));
             }
+            myChart.setChartJsVersion('4.4.0');
             myChart.setFormat('svg');
             myChart.setWidth('1280');
             myChart.setHeight('720');
@@ -559,46 +560,71 @@ export class Optimizer {
                   label: 'Number of worse solutions accepted',
                   data: worseSolutionStatistics,
                   fill: false,
-                  tension: 0.5,
                   type: 'line',
-                  yAxisID: 'y'
+                  yAxisID: 'y',
+                  borderColor: '#36a2eb'
                 },
                 {
                   label: 'Current ratio',
                   data: currentRatioStatistics,
                   fill: false,
-                  tension: 0.5,
                   type: 'scatter',
-                  yAxisID: 'y1'
+                  yAxisID: 'y1',
+                  borderColor: '#ff9f40'
                 }]
               },
               options: {
                 stacked: true,
-                title: {
-                  display: true,
-                  text: this.args.optimizer === 'SA' ? `${new Date().toLocaleDateString()} Evals: ${this.args.evals} Opt:${this.args.optimizer} ${temperatureLengthType} Seed: ${this.args.seed} Total time: ${timeDiff} Init tmp: ${initialTemperature} Alpha: ${alpha} Threshold (?): ${threshholdOfAcceptedSolutions}` : 
-                  `${new Date().toLocaleDateString()} Evals: ${this.args.evals} Opt:${this.args.optimizer} Seed: ${this.args.seed} Total time: ${timeDiff}`
+                plugins: {
+                  title: {
+                    display: true,
+                    text: this.args.optimizer === 'SA' ? `Ratio: ${globals.currentRatio} - ${timestamp} Evals: ${this.args.evals} Opt:${this.args.optimizer} ${temperatureLengthType} Seed: ${this.args.seed} Total time: ${timeDiff}` : 
+                    `Ratio: ${globals.currentRatio} - ${timestamp} Evals: ${this.args.evals} Opt:${this.args.optimizer} Seed: ${this.args.seed} Total time: ${timeDiff}`
+                  },
+                  subtitle: {
+                    display: true,
+                    text: this.args.optimizer === 'SA' ? `Init tmp: ${initialTemperature} Alpha: ${alpha} Threshold (?): ${threshholdOfAcceptedSolutions}` : ''
+                  }
                 },
                 "scales": {
-                  "yAxes": [
-                  {
-                    "id": "y",
-                    "type": "linear",
-                    "display": true,
-                    "position": "left",
-                    "suggestedMax": 1,
-                    "suggestedMin": 0
-                  }, 
-                  {
-                    "id": "y1",
-                    "type": "linear",
-                    "display": true,
-                    "position": "right",
-                    "gridLines": {
-                      "drawOnChartArea": false
-                    }
-                  }
-                  ]
+                  // "yAxes": [
+                  // {
+                  //   "id": "y",
+                  //   "type": "linear",
+                  //   "display": true,
+                  //   "position": "left",
+                  //   "suggestedMax": 1,
+                  //   "suggestedMin": 0
+                  // }, 
+                  // {
+                  //   "id": "y1",
+                  //   "type": "linear",
+                  //   "display": true,
+                  //   "position": "right",
+                  //   "gridLines": {
+                  //     "drawOnChartArea": false
+                  //   }
+                  // }
+                  // ]
+                  y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    suggestedMin: 0,
+                    suggestedMax: 1.0
+                  },
+                  y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+            
+                    // grid line settings
+                    grid: {
+                      drawOnChartArea: false, // only want the grid lines for one axis to show up
+                    },
+                    suggestedMin: 0.9,
+                    suggestedMax: 1.1
+                  },
                 }
               }
             });
