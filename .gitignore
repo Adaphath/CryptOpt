@@ -2,7 +2,7 @@ node_modules
 dist
 bins
 results/*
-!results/*.png
+!results/*.svg
 coverage
 .cache
 .vscode
