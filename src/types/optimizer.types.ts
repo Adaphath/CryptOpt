@@ -17,7 +17,7 @@
 import { BRIDGES_T } from "@/bridge";
 import { METHOD_T } from "@/bridge/bitcoin-core-bridge";
 import { CURVE_T } from "@/bridge/fiat-bridge";
-import { FRAME_POINTER_OPTIONS_T, MEMORY_CONSTRAINTS_OPTIONS_T, OPTIMIZER_OPTIONS_T } from "@/types";
+import { FRAME_POINTER_OPTIONS_T, MEMORY_CONSTRAINTS_OPTIONS_T, OPTIMIZER_OPTIONS_T, OptimizerConfig } from "@/types";
 
 export type OptimizerArgs = {
   evals: number;
@@ -39,6 +39,8 @@ export type OptimizerArgs = {
   framePointer: FRAME_POINTER_OPTIONS_T;
   memoryConstraints: MEMORY_CONSTRAINTS_OPTIONS_T;
   optimizer: OPTIMIZER_OPTIONS_T;
+  optimizerConfig?: OptimizerConfig;
+  optimizerConfigPath?: string; // filename for optimizer config
 };
 export type ParsedArgsT = OptimizerArgs & {
   startFromBestJson: boolean;

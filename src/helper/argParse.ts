@@ -28,7 +28,7 @@ import {
   type CURVE_T as FIAT_CURVE_T,
   type METHOD_T as FIAT_METHOD_T,
 } from "@/bridge/fiat-bridge/constants";
-import { errorOut, ERRORS } from "@/errors";
+import { ERRORS, errorOut } from "@/errors";
 
 import { FRAME_POINTER_OPTIONS, MEMORY_CONSTRAINTS_OPTIONS, OPTIMIZER_OPTIONS, ParsedArgsT } from "../types";
 
@@ -221,6 +221,10 @@ export const parsedArgs = y
     string: true,
     describe: "Which optimizer to use. 'LS' for local search, 'SA' for simulated annealing.",
     choices: OPTIMIZER_OPTIONS,
+  })
+  .option("optimizerConfigPath", {
+    string: true,
+    describe: "Path to a JSON file, which contains the optimizer config.",
   })
   .help("help")
   .alias("h", "help")

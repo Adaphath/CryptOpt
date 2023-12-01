@@ -35,7 +35,7 @@ import { registerExitHooks } from "@/helper/process";
 import { Model } from "@/model";
 import { Optimizer } from "@/optimizer";
 import { sha1Hash } from "@/paul";
-import type { CryptOpt, CryptoptGlobals, OptimizerArgs } from "@/types";
+import type { CryptOpt, CryptoptGlobals, OptimizerArgs, OptimizerConfig } from "@/types";
 
 import Logger from "./helper/Logger.class";
 
@@ -74,6 +74,13 @@ else if (parsedArgsFromCli.readState) {
   if (stateFile.parsedArgs) {
     parsedArgs = stateFile.parsedArgs;
   }
+}
+
+if (parsedArgs.optimizerConfigPath) {
+  const optimizerConfig: OptimizerConfig = JSON.parse(readFileSync(parsedArgs.optimizerConfigPath).toString());
+  parsedArgs.optimizerConfig = optimizerConfig;
+  parsedArgs.evals = optimizerConfig.evals ?? parsedArgs.evals;
+  parsedArgs.optimizer = optimizerConfig.option;
 }
 
 const { single, bets, betRatio, curve, method, verbose } = parsedArgs;

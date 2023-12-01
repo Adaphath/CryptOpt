@@ -35,6 +35,35 @@ export type MEMORY_CONSTRAINTS_OPTIONS_T = (typeof MEMORY_CONSTRAINTS_OPTIONS)[n
 export const OPTIMIZER_OPTIONS = ["LS", "SA"] as const;
 export type OPTIMIZER_OPTIONS_T = (typeof OPTIMIZER_OPTIONS)[number];
 
+export type OptimizerConfig = {
+  option: "LS";
+  evals: number;
+}
+| {
+  option: "SA";
+  evals: number;
+  acceptanceRate: number;
+  coolingRateAlpha: number;
+  temperatureLengthType: "TL1";
+  lengthConstant: number;
+}
+| {
+  option: "SA";
+  evals: number;
+  acceptanceRate: number;
+  coolingRateAlpha: number;
+  temperatureLengthType: "TL6";
+  threshholdOfAcceptedSolutions: number;
+}
+| {
+  option: "SA";
+  evals: number;
+  acceptanceRate: number;
+  coolingRateAlpha: number;
+  temperatureLengthType: "TL7";
+  checkLastIterations: number;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace CryptOpt {
   export type StateFile = {

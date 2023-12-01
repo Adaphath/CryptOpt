@@ -146,6 +146,8 @@ export class Optimizer {
       let ratioString = "";
       let numEvals = 0;
 
+      Logger.dev(`Opt Config: ${this.args.optimizerConfig?.option}`);
+
       // measurements
       // collect all improvements to calculate the average, median and stddeviation
       const improvements: number[] = [];
@@ -156,14 +158,21 @@ export class Optimizer {
       // balanced initial temperature = -(AVERAGE_DELTA/(ln(ACCEPTANCE_RATE)))
       const k = 1;
       const averageDelta = 190;
-      const acceptanceRate = 0.80;
+      let acceptanceRate = 0.85;
+      if (this.args.optimizerConfig?.option === "SA") {
+        acceptanceRate = this.args.optimizerConfig.acceptanceRate;
+      }
+
       const initialTemperature = Math.abs((k * averageDelta) / Math.log(acceptanceRate));
       Logger.dev(`initial temperature: ${initialTemperature}`);
       let temperature = initialTemperature;
 
       // geometric cooling scheme
       // constant alpha for temperature cooling scheme
-      const alpha = 0.95;
+      let alpha = 0.95;
+      if (this.args.optimizerConfig?.option === "SA") {
+        alpha = this.args.optimizerConfig.coolingRateAlpha ?? alpha;
+      }
 
       // statistics for worse solutions accepted
       let countWorseSolutions = 0;
@@ -177,16 +186,28 @@ export class Optimizer {
       
       // temperature length
       // fixed number of evaluations
-      const temperatureLengthType: string = 'TL1';
-      const lengthConstant = 50 / 10000
+      let temperatureLengthType: string = "TL1";
+      if (this.args.optimizerConfig?.option === "SA") {
+        temperatureLengthType = this.args.optimizerConfig.temperatureLengthType ?? temperatureLengthType;
+      }
+      let lengthConstant = 50 / 10000;
+      if (this.args.optimizerConfig?.option === "SA" && this.args.optimizerConfig.temperatureLengthType === "TL1") {
+        lengthConstant = this.args.optimizerConfig.lengthConstant ?? lengthConstant;
+      }
       const temperatureLengthEvals = Math.ceil(lengthConstant * this.args.evals);
 
       // adaptive temperature length (TL6) -> reduce temperature when a certain threshold of accepted solutions is reached
-      const threshholdOfAcceptedSolutions = 100;
+      let threshholdOfAcceptedSolutions = 100;
+      if (this.args.optimizerConfig?.option === "SA" && this.args.optimizerConfig.temperatureLengthType === "TL6") {
+        threshholdOfAcceptedSolutions = this.args.optimizerConfig.threshholdOfAcceptedSolutions ?? threshholdOfAcceptedSolutions;
+      }
       let numberOfAcceptedSolutions = 0;
 
       // adaptive temperature length (TL7) -> reduce temperature if the last x solutions were worse
-      const checkLastIterations = 5;
+      let checkLastIterations = 5;
+      if (this.args.optimizerConfig?.option === "SA" && this.args.optimizerConfig.temperatureLengthType === "TL7") {
+        checkLastIterations = this.args.optimizerConfig.checkLastIterations ?? checkLastIterations;
+      }
       let improvementsInLastIterations: boolean[] = [];
 
 
@@ -632,15 +653,21 @@ export class Optimizer {
 
 
             if (this.args.optimizer === "SA") {
-              chartPath = `./results/${timestamp}_${this.args.optimizer}_${temperatureLengthType}_${this.args.seed}_chart_adapttemp_${initialTemperature}_${alpha}_${threshholdOfAcceptedSolutions}.svg`;
+              chartPath = `_${timestamp}_${this.args.optimizer}_${temperatureLengthType}_${this.args.seed}_chart_adapttemp_${initialTemperature}_${alpha}_${threshholdOfAcceptedSolutions}.svg`;
             } else if (this.args.optimizer === "LS") {
-              chartPath = `./results/${timestamp}_${this.args.optimizer}_${this.args.seed}_chart.svg`;
+              chartPath = `_${timestamp}_${this.args.optimizer}_${this.args.seed}_chart.svg`;
             }
+
+            const [chartFile] = generateResultFilename(
+              { ...this.args, symbolname: this.symbolname },
+              [`${chartPath}`],
+            );
 
             Logger.dev(this.args.logComment);
             if (this.args.logComment === ' run') {
-              Logger.dev('will create charts')
-              myChart.toFile(chartPath).then(() => {
+              Logger.dev('will create charts');
+              Logger.dev(`chartFile: ${chartFile}`);
+              myChart.toFile(chartFile).then(() => {
                 console.log('created chart successfully');
               }).catch(e => {
                 console.error('Mothertrucking charts...');
