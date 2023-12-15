@@ -7,23 +7,23 @@
 
 # read --opt argument. if == LS only read config files with LS in the name to an array. if == SA only read config files with SA in the name to an array.
 if [ "$1" == "--opt=LS" ]; then
-  configs=($(ls config/*LS* | grep -v disabled))
+  configs=($(ls ../config/*LS* | grep -v disabled))
 elif [ "$1" == "--opt=SA" ]; then
-  configs=($(ls config/*SA* | grep -v disabled))
+  configs=($(ls ../config/*SA* | grep -v disabled))
 else
-  configs=($(ls config/* | grep -v disabled))
+  configs=($(ls ../config/* | grep -v disabled))
 fi
 
 
 # if the --file argument is given then only run the optimizer for the given config file
 if [ "$1" == "--file" ]; then
-  configs=($(ls config/$2))
+  configs=($(ls ../config/$2))
 fi
 
 echo "configs: ${configs[@]}"
 
 # generate results directory name based on date
-result_dir="results/$(date +%Y-%m-%d_%H-%M-%S)"
+result_dir="../results/$(date +%Y-%m-%d_%H-%M-%S)"
 
 seed=$(date +%s%3N)
 
