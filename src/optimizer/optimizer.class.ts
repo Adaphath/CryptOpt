@@ -20,7 +20,7 @@ import { Measuresuite } from "measuresuite";
 import { tmpdir } from "os";
 import { join, resolve as pathResolve } from "path";
 
-import ChartJsImage from 'chartjs-to-image';
+import ChartJsImage from "chartjs-to-image";
 
 import { assemble } from "@/assembler";
 import { FiatBridge } from "@/bridge/fiat-bridge";
@@ -43,6 +43,7 @@ import { Paul, sha1Hash } from "@/paul";
 import { RegisterAllocator } from "@/registerAllocator";
 import { AnalyseResult, OptimizerArgs } from "@/types";
 
+import fs from "fs";
 import { genStatistics, genStatusLine, logMutation, printStartInfo } from "./optimizer.helper";
 import { init } from "./optimizer.helper.class";
 
@@ -183,7 +184,8 @@ export class Optimizer {
         x: number;
         y: number;
       }[] = [];
-      
+      let currentRatioStatisticsDetailed: number[] = [];
+
       // temperature length
       // fixed number of evaluations
       let temperatureLengthType: string = "TL1";
@@ -191,31 +193,39 @@ export class Optimizer {
         temperatureLengthType = this.args.optimizerConfig.temperatureLengthType ?? temperatureLengthType;
       }
       let lengthConstant = 50 / 10000;
-      if (this.args.optimizerConfig?.option === "SA" && this.args.optimizerConfig.temperatureLengthType === "TL1") {
+      if (
+        this.args.optimizerConfig?.option === "SA" &&
+        this.args.optimizerConfig.temperatureLengthType === "TL1"
+      ) {
         lengthConstant = this.args.optimizerConfig.lengthConstant ?? lengthConstant;
       }
       const temperatureLengthEvals = Math.ceil(lengthConstant * this.args.evals);
 
       // adaptive temperature length (TL6) -> reduce temperature when a certain threshold of accepted solutions is reached
       let threshholdOfAcceptedSolutions = 100;
-      if (this.args.optimizerConfig?.option === "SA" && this.args.optimizerConfig.temperatureLengthType === "TL6") {
-        threshholdOfAcceptedSolutions = this.args.optimizerConfig.threshholdOfAcceptedSolutions ?? threshholdOfAcceptedSolutions;
+      if (
+        this.args.optimizerConfig?.option === "SA" &&
+        this.args.optimizerConfig.temperatureLengthType === "TL6"
+      ) {
+        threshholdOfAcceptedSolutions =
+          this.args.optimizerConfig.threshholdOfAcceptedSolutions ?? threshholdOfAcceptedSolutions;
       }
       let numberOfAcceptedSolutions = 0;
 
       // adaptive temperature length (TL7) -> reduce temperature if the last x solutions were worse
       let checkLastIterations = 5;
-      if (this.args.optimizerConfig?.option === "SA" && this.args.optimizerConfig.temperatureLengthType === "TL7") {
+      if (
+        this.args.optimizerConfig?.option === "SA" &&
+        this.args.optimizerConfig.temperatureLengthType === "TL7"
+      ) {
         checkLastIterations = this.args.optimizerConfig.checkLastIterations ?? checkLastIterations;
       }
       let improvementsInLastIterations: boolean[] = [];
-
 
       Logger.dev(`temperature length: ${temperatureLengthEvals}`);
 
       const optimistaionStartDate = Date.now();
       let accumulatedTimeSpentByMeasuring = 0;
-      
 
       let currentNameOfTheFunctionThatHasTheMutation = FUNCTIONS.F_A;
       let time = Date.now();
@@ -246,12 +256,10 @@ export class Optimizer {
 
         // check if this was the first round
         if (numEvals == 0) {
-
           // then point to fB and continue, write first
           if (this.asmStrings[FUNCTIONS.F_A].includes("undefined")) {
             const p = pathResolve(this.libcheckfunctionDirectory, "with_undefined.asm");
             writeString(p, this.asmStrings[FUNCTIONS.F_A]);
-
 
             const e = `\n\n\nNah... we dont want undefined; wrote ${p}, plx fix. \n\n\n`;
             console.error(e);
@@ -333,39 +341,35 @@ export class Optimizer {
           Logger.log(currentFunctionIsA() ? "New".padEnd(10) : "New".padStart(10));
 
           let kept: boolean;
-          
+
           // first calculate the absolute improvement between the mutated and the function before
           const absoluteImprovement = currentFunctionIsA() ? meanrawA - meanrawB : meanrawB - meanrawA;
-
 
           // Compare the two functions
           // Local random search: if the new function is better, keep it.
           // Simulated Annealing: Acceptance Criterion -> Metropolis condition
 
           // local random search compares meanRawA and meanRawB
-          const mutatedIsBetter = (meanrawA <= meanrawB && currentFunctionIsA()) || (meanrawA >= meanrawB && !currentFunctionIsA());
+          const mutatedIsBetter =
+            (meanrawA <= meanrawB && currentFunctionIsA()) || (meanrawA >= meanrawB && !currentFunctionIsA());
 
-
-          if (!mutatedIsBetter)
-            countWorseSolutions++;
+          if (!mutatedIsBetter) countWorseSolutions++;
 
           // adaptive temperature length -> reduce temperature if the last x solutions were worse
           improvementsInLastIterations.push(mutatedIsBetter);
 
           // collect the improvements and worsenings
-          if (mutatedIsBetter)
-            improvements.push(absoluteImprovement);
-          else 
-            worsenings.push(absoluteImprovement);
+          if (mutatedIsBetter) improvements.push(absoluteImprovement);
+          else worsenings.push(absoluteImprovement);
 
           // metroplis condition for simulated annealing
           // use the relative improvement
-          const metropolisCondition = Math.exp((-absoluteImprovement) / temperature);
+          const metropolisCondition = Math.exp(-absoluteImprovement / temperature);
 
           const metropolis = mutatedIsBetter || metropolisCondition > Math.random();
-          
+
           if (
-            (this.args.optimizer === "LS"  && mutatedIsBetter) || // local random search
+            (this.args.optimizer === "LS" && mutatedIsBetter) || // local random search
             (this.args.optimizer === "SA" && metropolis) // simulated annealing
           ) {
             // worse function is kept because of metropolis condition
@@ -392,35 +396,38 @@ export class Optimizer {
             Logger.log(`temperature: ${temperature}`);
             // Temperature Length
             // fixed number of evaluations
-            if (temperatureLengthType === 'TL1' && numEvals % temperatureLengthEvals === 0) {
+            if (temperatureLengthType === "TL1" && numEvals % temperatureLengthEvals === 0) {
               // Decrease temperature
               temperature = temperature * alpha;
-              
+
               Logger.dev(`New temperature: ${temperature}`);
             }
 
             // adaptive temperature length (TL6)
-            if (temperatureLengthType === 'TL6' && kept) {
+            if (temperatureLengthType === "TL6" && kept) {
               // increase the number of accepted solutions
               numberOfAcceptedSolutions++;
             }
-            if (temperatureLengthType === 'TL6' && numberOfAcceptedSolutions >= threshholdOfAcceptedSolutions) {
+            if (
+              temperatureLengthType === "TL6" &&
+              numberOfAcceptedSolutions >= threshholdOfAcceptedSolutions
+            ) {
               // Decrease temperature
               temperature = temperature * alpha;
-              
+
               Logger.dev(`New temperature: ${temperature}`);
 
               // reset the number of accepted solutions
               numberOfAcceptedSolutions = 0;
             }
 
-            if (temperatureLengthType === 'TL7') {
+            if (temperatureLengthType === "TL7") {
               // check if the list of improvements is larger than the checkLastIterations
               if (improvementsInLastIterations.length > checkLastIterations) {
-                if (improvementsInLastIterations.every(value => !value)) {
+                if (improvementsInLastIterations.every((value) => !value)) {
                   // Decrease temperature
                   temperature = temperature * alpha;
-                  
+
                   Logger.dev(`New temperature: ${temperature}`);
                 }
 
@@ -429,7 +436,6 @@ export class Optimizer {
               }
             }
           }
-
 
           // if checkpoint for worse solutions accepted is reached
           if (numEvals >= nextEvaluationCheckpoint) {
@@ -443,7 +449,7 @@ export class Optimizer {
 
             currentRatioStatistics.push({
               x: numEvals,
-              y: globals.currentRatio
+              y: globals.currentRatio,
             });
 
             // reset the number of worse solutions accepted and the number of worse solutions
@@ -454,8 +460,6 @@ export class Optimizer {
             nextEvaluationCheckpoint += Math.ceil(0.01 * this.args.evals);
           }
 
-          
-          
           const indexGood = Number(meanrawA > meanrawB);
           const indexBad = 1 - indexGood;
           globals.currentRatio = meanrawCheck / Math.min(meanrawB, meanrawA);
@@ -474,9 +478,7 @@ export class Optimizer {
             per_second_counter = 0;
           }
 
-
           logMutation({ choice, kept, numEvals });
-
 
           if (numEvals % PRINT_EVERY == 0) {
             // print every 10th eval
@@ -506,6 +508,8 @@ export class Optimizer {
             globals.convergence.push(ratioString);
           }
 
+          currentRatioStatisticsDetailed;
+
           // Increase  Number of evaluations taken.
           numEvals++;
 
@@ -514,7 +518,7 @@ export class Optimizer {
             globals.time.generateCryptopt =
               (Date.now() - optimistaionStartDate) / 1000 - globals.time.validate;
             clearInterval(intervalHandle);
- 
+
             Logger.log("writing current asm");
             const elapsed = Date.now() - optimistaionStartDate;
             const paddedSeed = padSeed(Paul.initialSeed);
@@ -557,7 +561,7 @@ export class Optimizer {
             Logger.log(`Worse solution statistics: ${worseSolutionStatistics}`);
 
             // format timestamp to be used in chart name
-            const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\./g, '-');
+            const timestamp = new Date().toISOString().replace(/:/g, "-").replace(/\./g, "-");
 
             const endTime = new Date();
 
@@ -567,47 +571,54 @@ export class Optimizer {
 
             const labels = [];
             for (let i = 1; i <= 100; i++) {
-              labels.push(Math.ceil(i*0.01*this.args.evals));
+              labels.push(Math.ceil(i * 0.01 * this.args.evals));
             }
-            myChart.setChartJsVersion('4.4.0');
-            myChart.setFormat('svg');
-            myChart.setWidth('1280');
-            myChart.setHeight('720');
+            myChart.setChartJsVersion("4.4.0");
+            myChart.setFormat("svg");
+            myChart.setWidth("1280");
+            myChart.setHeight("720");
             myChart.setConfig({
-              type: 'line',
+              type: "line",
               data: {
                 labels: labels,
-                datasets: [{
-                  label: 'Number of worse solutions accepted',
-                  data: worseSolutionStatistics,
-                  fill: false,
-                  type: 'line',
-                  yAxisID: 'y',
-                  borderColor: '#36a2eb'
-                },
-                {
-                  label: 'Current ratio',
-                  data: currentRatioStatistics,
-                  fill: false,
-                  type: 'scatter',
-                  yAxisID: 'y1',
-                  borderColor: '#ff9f40'
-                }]
+                datasets: [
+                  {
+                    label: "Number of worse solutions accepted",
+                    data: worseSolutionStatistics,
+                    fill: false,
+                    type: "line",
+                    yAxisID: "y",
+                    borderColor: "#36a2eb",
+                  },
+                  {
+                    label: "Current ratio",
+                    data: currentRatioStatistics,
+                    fill: false,
+                    type: "scatter",
+                    yAxisID: "y1",
+                    borderColor: "#ff9f40",
+                  },
+                ],
               },
               options: {
                 stacked: true,
                 plugins: {
                   title: {
                     display: true,
-                    text: this.args.optimizer === 'SA' ? `Ratio: ${globals.currentRatio} - ${timestamp} Evals: ${this.args.evals} Opt:${this.args.optimizer} ${temperatureLengthType} Seed: ${this.args.seed} Total time: ${timeDiff}` : 
-                    `Ratio: ${globals.currentRatio} - ${timestamp} Evals: ${this.args.evals} Opt:${this.args.optimizer} Seed: ${this.args.seed} Total time: ${timeDiff}`
+                    text:
+                      this.args.optimizer === "SA"
+                        ? `Ratio: ${globals.currentRatio} - ${timestamp} Evals: ${this.args.evals} Opt:${this.args.optimizer} ${temperatureLengthType} Seed: ${this.args.seed} Total time: ${timeDiff}`
+                        : `Ratio: ${globals.currentRatio} - ${timestamp} Evals: ${this.args.evals} Opt:${this.args.optimizer} Seed: ${this.args.seed} Total time: ${timeDiff}`,
                   },
                   subtitle: {
                     display: true,
-                    text: this.args.optimizer === 'SA' ? `Init tmp: ${initialTemperature} Alpha: ${alpha} Threshold (?): ${threshholdOfAcceptedSolutions}` : ''
-                  }
+                    text:
+                      this.args.optimizer === "SA"
+                        ? `Init tmp: ${initialTemperature} Alpha: ${alpha} Threshold (?): ${threshholdOfAcceptedSolutions}`
+                        : "",
+                  },
                 },
-                "scales": {
+                scales: {
                   // "yAxes": [
                   // {
                   //   "id": "y",
@@ -616,7 +627,7 @@ export class Optimizer {
                   //   "position": "left",
                   //   "suggestedMax": 1,
                   //   "suggestedMin": 0
-                  // }, 
+                  // },
                   // {
                   //   "id": "y1",
                   //   "type": "linear",
@@ -628,29 +639,28 @@ export class Optimizer {
                   // }
                   // ]
                   y: {
-                    type: 'linear',
+                    type: "linear",
                     display: true,
-                    position: 'left',
+                    position: "left",
                     suggestedMin: 0,
-                    suggestedMax: 1.0
+                    suggestedMax: 1.0,
                   },
                   y1: {
-                    type: 'linear',
+                    type: "linear",
                     display: true,
-                    position: 'right',
-            
+                    position: "right",
+
                     // grid line settings
                     grid: {
                       drawOnChartArea: false, // only want the grid lines for one axis to show up
                     },
                     suggestedMin: 0.9,
-                    suggestedMax: 1.1
+                    suggestedMax: 1.1,
                   },
-                }
-              }
+                },
+              },
             });
-            let chartPath = '';
-
+            let chartPath = "";
 
             if (this.args.optimizer === "SA") {
               chartPath = `_${timestamp}_${this.args.optimizer}_${temperatureLengthType}_${this.args.seed}_chart_adapttemp_${initialTemperature}_${alpha}_${threshholdOfAcceptedSolutions}.svg`;
@@ -658,21 +668,56 @@ export class Optimizer {
               chartPath = `_${timestamp}_${this.args.optimizer}_${this.args.seed}_chart.svg`;
             }
 
-            const [chartFile] = generateResultFilename(
-              { ...this.args, symbolname: this.symbolname },
-              [`${chartPath}`],
-            );
+            // collect all the data for the json details file
+            const jsonDetailsFilePath = `_${timestamp}_details.json`;
+
+            const jsonDetails = {
+              seed: this.args.seed,
+              optimizer: this.args.optimizer,
+              initialTemperature: initialTemperature,
+              alpha: alpha,
+              threshholdOfAcceptedSolutions: threshholdOfAcceptedSolutions,
+              temperatureLengthType: temperatureLengthType,
+              temperatureLengthEvals: temperatureLengthEvals,
+              worseSolutionStatistics: worseSolutionStatistics,
+              ratio: globals.currentRatio,
+              convergence: globals.convergence,
+              numEvals: this.args.evals,
+              elapsed: elapsed,
+              batchSize: batchSize,
+              numBatches: numBatches,
+              acc: accumulatedTimeSpentByMeasuring,
+              numRevert: this.numRevert,
+              numMut: this.numMut,
+              counter: this.measuresuite.timer,
+              framePointer: this.args.framePointer,
+              memoryConstraints: this.args.memoryConstraints,
+              cyclegoal: this.args.cyclegoal,
+            };
+
+            const [jsonDetailsFile] = generateResultFilename({ ...this.args, symbolname: this.symbolname }, [
+              `${jsonDetailsFilePath}`,
+            ]);
+
+            fs.writeFileSync(jsonDetailsFile, JSON.stringify(jsonDetails));
+
+            const [chartFile] = generateResultFilename({ ...this.args, symbolname: this.symbolname }, [
+              `${chartPath}`,
+            ]);
 
             Logger.dev(this.args.logComment);
-            if (this.args.logComment === ' run') {
-              Logger.dev('will create charts');
+            if (this.args.logComment === " run") {
+              Logger.dev("will create charts");
               Logger.dev(`chartFile: ${chartFile}`);
-              myChart.toFile(chartFile).then(() => {
-                console.log('created chart successfully');
-              }).catch(e => {
-                console.error('Mothertrucking charts...');
-                console.error(e);
-              }); 
+              myChart
+                .toFile(chartFile)
+                .then(() => {
+                  console.log("created chart successfully");
+                })
+                .catch((e) => {
+                  console.error("Mothertrucking charts...");
+                  console.error(e);
+                });
             }
             // print improvement statistics
             // Calculate the average
@@ -685,7 +730,7 @@ export class Optimizer {
             let median = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 
             // Calculate the standard deviation
-            let squareDiffs = improvements.map(value => (value - avg) ** 2);
+            let squareDiffs = improvements.map((value) => (value - avg) ** 2);
             let avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / squareDiffs.length;
             let stdDev = Math.sqrt(avgSquareDiff);
 
@@ -701,11 +746,15 @@ export class Optimizer {
             // Calculate the median
             let sortedWorsenings = [...worsenings].sort((a, b) => a - b);
             let midWorsenings = Math.floor(sortedWorsenings.length / 2);
-            let medianWorsenings = sortedWorsenings.length % 2 !== 0 ? sortedWorsenings[midWorsenings] : (sortedWorsenings[midWorsenings - 1] + sortedWorsenings[midWorsenings]) / 2;
+            let medianWorsenings =
+              sortedWorsenings.length % 2 !== 0
+                ? sortedWorsenings[midWorsenings]
+                : (sortedWorsenings[midWorsenings - 1] + sortedWorsenings[midWorsenings]) / 2;
 
             // Calculate the standard deviation
-            let squareDiffsWorsenings = worsenings.map(value => (value - avgWorsenings) ** 2);
-            let avgSquareDiffWorsenings = squareDiffsWorsenings.reduce((a, b) => a + b, 0) / squareDiffsWorsenings.length;
+            let squareDiffsWorsenings = worsenings.map((value) => (value - avgWorsenings) ** 2);
+            let avgSquareDiffWorsenings =
+              squareDiffsWorsenings.reduce((a, b) => a + b, 0) / squareDiffsWorsenings.length;
             let stdDevWorsenings = Math.sqrt(avgSquareDiffWorsenings);
 
             Logger.dev(`Worsenings Average: ${avgWorsenings}`);
@@ -748,7 +797,7 @@ export class Optimizer {
     const seconds = Math.floor((diff / 1000) % 60);
 
     return `${days} days, ${hours} hours, ${minutes} minutes, ${seconds} seconds`;
-}
+  }
 
   private cleanLibcheckfunctions() {
     if (existsSync(this.libcheckfunctionDirectory)) {
