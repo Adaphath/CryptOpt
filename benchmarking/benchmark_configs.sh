@@ -62,8 +62,12 @@ do
       # run the optimizer for each config
       for ((i=1;i<=n;i++));
       do
-        # run the optimizer
-        ./CryptOpt --optimizerConfigPath $config --curve $curve --method $method --resultDir $result_dir --seed $seed
+        # run the optimizer on each core in parallel
+        for ((core=0;core<4;core++));
+        do
+          taskset -c $core ./CryptOpt --optimizerConfigPath $config --curve $curve --method $method --resultDir $result_dir --seed $seed &
+        done
+        wait # wait for all background processes to finish
       done
     done
   done

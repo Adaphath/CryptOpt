@@ -144,7 +144,7 @@ else:
 # get current timestamp
 now = datetime.datetime.now()
 fig.set_size_inches(10, 5)
-fig.savefig('scripts/' + now.isoformat() + '.svg')
+fig.savefig('benchmarking/' + now.isoformat() + '.svg')
     
 # fig, ax1 = plt.subplots(3)
 # fig.suptitle('Convergence and worse solution statistics')
