@@ -668,57 +668,6 @@ export class Optimizer {
               chartPath = `_${timestamp}_${this.args.optimizer}_${this.args.seed}_chart.svg`;
             }
 
-            // collect all the data for the json details file
-            const jsonDetailsFilePath = `_${timestamp}_details.json`;
-
-            const jsonDetails = {
-              seed: this.args.seed,
-              optimizer: this.args.optimizer,
-              initialTemperature: initialTemperature,
-              alpha: alpha,
-              threshholdOfAcceptedSolutions: threshholdOfAcceptedSolutions,
-              temperatureLengthType: temperatureLengthType,
-              temperatureLengthEvals: temperatureLengthEvals,
-              worseSolutionStatistics: worseSolutionStatistics,
-              ratio: globals.currentRatio,
-              convergence: globals.convergence,
-              numEvals: this.args.evals,
-              elapsed: elapsed,
-              batchSize: batchSize,
-              numBatches: numBatches,
-              acc: accumulatedTimeSpentByMeasuring,
-              numRevert: this.numRevert,
-              numMut: this.numMut,
-              counter: this.measuresuite.timer,
-              framePointer: this.args.framePointer,
-              memoryConstraints: this.args.memoryConstraints,
-              cyclegoal: this.args.cyclegoal,
-            };
-
-            const [jsonDetailsFile] = generateResultFilename({ ...this.args, symbolname: this.symbolname }, [
-              `${jsonDetailsFilePath}`,
-            ]);
-
-            fs.writeFileSync(jsonDetailsFile, JSON.stringify(jsonDetails));
-
-            const [chartFile] = generateResultFilename({ ...this.args, symbolname: this.symbolname }, [
-              `${chartPath}`,
-            ]);
-
-            Logger.dev(this.args.logComment);
-            if (this.args.logComment === " run") {
-              Logger.dev("will create charts");
-              Logger.dev(`chartFile: ${chartFile}`);
-              myChart
-                .toFile(chartFile)
-                .then(() => {
-                  console.log("created chart successfully");
-                })
-                .catch((e) => {
-                  console.error("Mothertrucking charts...");
-                  console.error(e);
-                });
-            }
             // print improvement statistics
             // Calculate the average
             let sum = improvements.reduce((a, b) => a + b, 0);
@@ -760,6 +709,70 @@ export class Optimizer {
             Logger.dev(`Worsenings Average: ${avgWorsenings}`);
             Logger.dev(`Worsenings Median: ${medianWorsenings}`);
             Logger.dev(`Worsenings Standard Deviation: ${stdDevWorsenings}`);
+
+            const randomRunId = Math.ceil(Math.random() * 1000000);
+
+            // collect all the data for the json details file
+            const jsonDetailsFilePath = `_${timestamp}_${randomRunId}_details.json`;
+
+            const jsonDetails = {
+              seed: this.args.seed,
+              optimizer: this.args.optimizer,
+              initialTemperature: initialTemperature,
+              alpha: alpha,
+              threshholdOfAcceptedSolutions: threshholdOfAcceptedSolutions,
+              temperatureLengthType: temperatureLengthType,
+              temperatureLengthEvals: temperatureLengthEvals,
+              worseSolutionStatistics: worseSolutionStatistics,
+              ratio: globals.currentRatio,
+              convergence: globals.convergence,
+              numEvals: this.args.evals,
+              elapsed: elapsed,
+              batchSize: batchSize,
+              numBatches: numBatches,
+              acc: accumulatedTimeSpentByMeasuring,
+              numRevert: this.numRevert,
+              numMut: this.numMut,
+              counter: this.measuresuite.timer,
+              framePointer: this.args.framePointer,
+              memoryConstraints: this.args.memoryConstraints,
+              cyclegoal: this.args.cyclegoal,
+              improvements: {
+                avg: avg,
+                median: median,
+                stdDev: stdDev,
+              },
+              worsenings: {
+                avg: avgWorsenings,
+                median: medianWorsenings,
+                stdDev: stdDevWorsenings,
+              },
+            };
+
+            const [jsonDetailsFile] = generateResultFilename({ ...this.args, symbolname: this.symbolname }, [
+              `${jsonDetailsFilePath}`,
+            ]);
+
+            fs.writeFileSync(jsonDetailsFile, JSON.stringify(jsonDetails));
+
+            const [chartFile] = generateResultFilename({ ...this.args, symbolname: this.symbolname }, [
+              `${chartPath}`,
+            ]);
+
+            Logger.dev(this.args.logComment);
+            if (this.args.logComment === " run") {
+              Logger.dev("will create charts");
+              Logger.dev(`chartFile: ${chartFile}`);
+              myChart
+                .toFile(chartFile)
+                .then(() => {
+                  console.log("created chart successfully");
+                })
+                .catch((e) => {
+                  console.error("Mothertrucking charts...");
+                  console.error(e);
+                });
+            }
 
             if (shouldProof(this.args)) {
               // and proof correct
