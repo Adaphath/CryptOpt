@@ -1,0 +1,8 @@
+{
+  "option": "SA",
+  "evals": 200000,
+  "acceptanceRate": 0.85,
+  "coolingRateAlpha": 0.98,
+  "temperatureLengthType": "TL6",
+  "threshholdOfAcceptedSolutions": 125
+}
