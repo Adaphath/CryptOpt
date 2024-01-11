@@ -171,16 +171,14 @@ def findBestSAConfiguration(directories, curve, method, evaluations):
   else:
     return None
   
-def generateComparisonPlot(bestResults, curve, method, evaluations):
-  # generate a plot with the best results for LS, SA_FIXED and SA_THRESHOLD
-  # x axis: number of evaluations (logarithmic)
-  # y axis: ratio
-  
+def generateComparisonPlot(bestResults, curve, method, evaluations):  
   # get the data for LS
   LSResult = bestResults[curve][method][evaluations]["LS"]
   LSData = getAverageAndConfidenceFromConfiguration(LSResult["path"], LSResult)
   
   # get the data for SA_FIXED
+  if bestResults[curve][method][evaluations]["SA"] is None:
+    return
   SA_FIXEDResult = bestResults[curve][method][evaluations]["SA"]["FIXED"]
   SA_FIXEDData = getAverageAndConfidenceFromConfiguration(SA_FIXEDResult["path"], SA_FIXEDResult)
   
@@ -191,12 +189,58 @@ def generateComparisonPlot(bestResults, curve, method, evaluations):
   # write the data to a file
   outputFilename = f"comparison_{curve}_{method}_{evaluations}.json"
   outputFilePath = os.path.join(os.path.dirname(os.path.realpath(__file__)), outputFilename)
-  with open(outputFilePath, "w") as f:
-    json.dump({
-      "LS": LSData,
-      "SA_FIXED": SA_FIXEDData,
-      "SA_THRESHOLD": SA_THRESHOLDData
-    }, f)
+  # with open(outputFilePath, "w") as f:
+  #   json.dump({
+  #     "LS": LSData,
+  #     "SA_FIXED": SA_FIXEDData,
+  #     "SA_THRESHOLD": SA_THRESHOLDData
+  #   }, f)
+    
+  # use seaborn to plot the data
+  import matplotlib.pyplot as plt
+  import seaborn as sns
+  
+  # disable grid lines
+  sns.set_style("whitegrid")
+  
+  # set the font size
+  sns.set(font_scale=1.5)
+  
+  # create a new figure
+  fig, ax = plt.subplots(figsize=(12, 8))
+  
+  # plot the data
+  # x axis: number of evaluations (logarithmic)
+  # y axis: ratio
+  # hue: strategy (LS, SA_FIXED, SA_THRESHOLD)
+  max_length = max(len(LSData["averageConvergence"]), len(SA_FIXEDData["averageConvergence"]), len(SA_THRESHOLDData["averageConvergence"]))
+  # create arrays with our first value of LSData["averageConvergence"] as padding
+  paddingArray = np.full(max_length - len(LSData["averageConvergence"]), LSData["averageConvergence"][0])
+  
+  LSData["averageConvergence"] = np.concatenate((paddingArray, LSData["averageConvergence"]))
+  
+  sns.lineplot(data=LSData["averageConvergence"], label=f"LS (95%: {np.round(LSResult['confidence_interval'][0], 3)} - {np.round(LSResult['confidence_interval'][1], 3)})", ax=ax, alpha=1)
+  sns.lineplot(data=SA_FIXEDData["averageConvergence"], label=f"SA_FIXED (95%: {np.round(SA_FIXEDResult['confidence_interval'][0], 3)} - {np.round(SA_FIXEDResult['confidence_interval'][1], 3)})", ax=ax, alpha=0.5)
+  sns.lineplot(data=SA_THRESHOLDData["averageConvergence"], label=f"SA_THRESHOLD (95%: {np.round(SA_THRESHOLDResult['confidence_interval'][0], 3)} - {np.round(SA_THRESHOLDResult['confidence_interval'][1], 3)})", ax=ax, alpha=0.5)
+  
+  # set the x axis to logarithmic
+  ax.set_xscale("log")
+  
+  # disable grid lines
+  ax.grid(False)
+  
+  # set the x axis label
+  ax.set_xlabel("Number of evaluations")
+  
+  # set the y axis label
+  ax.set_ylabel("Ratio")
+  
+  # set the title
+  ax.set_title(f"Comparison of LS, SA_FIXED and SA_THRESHOLD for {curve}_{method}_{evaluations}")
+  
+  # save the figure
+  fig.savefig(f"comparison_{curve}_{method}_{evaluations}.png")
+  
 
 def main():
   parser = argparse.ArgumentParser()
@@ -227,6 +271,13 @@ def main():
         identifier = convertFilenameToIdentifier(file)
         identifier["path"] = os.path.join(directory, identifier["configuration"])
         print(identifier)
+        # get the data for this identifier
+        data = []
+        with open(os.path.join(directory, file)) as f:
+          data = json.load(f)
+          
+        identifier["confidence_interval"] = data["confidence_interval"]
+        identifier["best_results"] = data["best_results"]
         identifiers.append(identifier)
 
   for identifier in identifiers:
@@ -238,13 +289,20 @@ def main():
         "path": identifier["path"],
         "curve": identifier["curve"],
         "method": identifier["method"],
-        "evaluations": identifier["evaluations"]
+        "evaluations": identifier["evaluations"],
+        "confidence_interval": identifier["confidence_interval"],
+        "best_results": identifier["best_results"]
       },
       "SA": SAResults
     }
 
   print(bestResults)
-  generateComparisonPlot(bestResults, "curve25519", "mul", "10k")
+  
+  # generate a plot for every curve and method and evaluation
+  for curve in bestResults:
+    for method in bestResults[curve]:
+      for evaluations in bestResults[curve][method]:
+        generateComparisonPlot(bestResults, curve, method, evaluations)
 
 # get the data
 # every configuration has a directory with 10 runs in it and the curve with method as a subdirectory
