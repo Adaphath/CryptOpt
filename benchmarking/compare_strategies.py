@@ -219,12 +219,62 @@ def generateComparisonPlot(bestResults, curve, method, evaluations):
   
   LSData["averageConvergence"] = np.concatenate((paddingArray, LSData["averageConvergence"]))
   
-  sns.lineplot(data=LSData["averageConvergence"], label=f"LS (95%: {np.round(LSResult['confidence_interval'][0], 3)} - {np.round(LSResult['confidence_interval'][1], 3)})", ax=ax, alpha=1)
-  sns.lineplot(data=SA_FIXEDData["averageConvergence"], label=f"SA_FIXED (95%: {np.round(SA_FIXEDResult['confidence_interval'][0], 3)} - {np.round(SA_FIXEDResult['confidence_interval'][1], 3)})", ax=ax, alpha=0.5)
-  sns.lineplot(data=SA_THRESHOLDData["averageConvergence"], label=f"SA_THRESHOLD (95%: {np.round(SA_THRESHOLDResult['confidence_interval'][0], 3)} - {np.round(SA_THRESHOLDResult['confidence_interval'][1], 3)})", ax=ax, alpha=0.5)
+  sns.lineplot(data=LSData["averageConvergence"], label=f"LS (95%: {np.round(LSResult['confidence_interval'][0], 3)} - {np.round(LSResult['confidence_interval'][1], 3)})", ax=ax, alpha=0.5, color="blue")
+  
+  upperConfidence = []
+  lowerConfidence = []
+  
+  for i in range(0, len(LSData["confidence"])):
+    upperConfidence.append(LSData["confidence"][i][1])
+    lowerConfidence.append(LSData["confidence"][i][0])
+  
+  # add padding to the confidence interval
+  upperConfidencePadding = np.full(max_length - len(upperConfidence), upperConfidence[0])
+  
+  upperConfidence = np.concatenate((upperConfidencePadding, upperConfidence))
+  lowerConfidence = np.concatenate((upperConfidencePadding, lowerConfidence))
+    
+  # plot the confidence interval
+  ax.fill_between(range(0, len(upperConfidence)), upperConfidence, lowerConfidence, alpha=0.1, color="blue")
+  
+  sns.lineplot(data=SA_FIXEDData["averageConvergence"], label=f"SA_FIXED (95%: {np.round(SA_FIXEDResult['confidence_interval'][0], 3)} - {np.round(SA_FIXEDResult['confidence_interval'][1], 3)})", ax=ax, alpha=0.5, color="orange")
+  
+  upperConfidence = []
+  lowerConfidence = []
+  
+  for i in range(0, len(SA_FIXEDData["confidence"])):
+    upperConfidence.append(SA_FIXEDData["confidence"][i][1])
+    lowerConfidence.append(SA_FIXEDData["confidence"][i][0])
+    
+  # add padding to the confidence interval
+  upperConfidencePadding = np.full(max_length - len(upperConfidence), upperConfidence[0])
+  
+  upperConfidence = np.concatenate((upperConfidencePadding, upperConfidence))
+  lowerConfidence = np.concatenate((upperConfidencePadding, lowerConfidence))
+  
+  # plot the confidence interval
+  ax.fill_between(range(0, len(upperConfidence)), upperConfidence, lowerConfidence, alpha=0.1, color="orange")
+  
+  sns.lineplot(data=SA_THRESHOLDData["averageConvergence"], label=f"SA_THRESHOLD (95%: {np.round(SA_THRESHOLDResult['confidence_interval'][0], 3)} - {np.round(SA_THRESHOLDResult['confidence_interval'][1], 3)})", ax=ax, alpha=0.5, color="green")
+  
+  upperConfidence = []
+  lowerConfidence = []
+  
+  for i in range(0, len(SA_THRESHOLDData["confidence"])):
+    upperConfidence.append(SA_THRESHOLDData["confidence"][i][1])
+    lowerConfidence.append(SA_THRESHOLDData["confidence"][i][0])
+    
+  # add padding to the confidence interval
+  upperConfidencePadding = np.full(max_length - len(upperConfidence), upperConfidence[0])
+
+  upperConfidence = np.concatenate((upperConfidencePadding, upperConfidence))
+  lowerConfidence = np.concatenate((upperConfidencePadding, lowerConfidence))
+  
+  # plot the confidence interval
+  ax.fill_between(range(0, len(upperConfidence)), upperConfidence, lowerConfidence, alpha=0.1, color="green")
   
   # set the x axis to logarithmic
-  ax.set_xscale("log")
+  # ax.set_xscale("log")
   
   # disable grid lines
   ax.grid(False)
@@ -298,11 +348,13 @@ def main():
 
   print(bestResults)
   
+  generateComparisonPlot(bestResults, "curve25519", "mul", "200k")
+  
   # generate a plot for every curve and method and evaluation
-  for curve in bestResults:
-    for method in bestResults[curve]:
-      for evaluations in bestResults[curve][method]:
-        generateComparisonPlot(bestResults, curve, method, evaluations)
+  # for curve in bestResults:
+  #   for method in bestResults[curve]:
+  #     for evaluations in bestResults[curve][method]:
+  #       generateComparisonPlot(bestResults, curve, method, evaluations)
 
 # get the data
 # every configuration has a directory with 10 runs in it and the curve with method as a subdirectory
