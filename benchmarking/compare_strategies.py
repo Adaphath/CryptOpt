@@ -11,6 +11,9 @@ import argparse
 import json
 import os
 import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
 
 from scipy import stats
 
@@ -171,7 +174,7 @@ def findBestSAConfiguration(directories, curve, method, evaluations):
   else:
     return None
   
-def generateComparisonPlot(bestResults, curve, method, evaluations):  
+def generateSingleRunComparisonPlot(bestResults, curve, method, evaluations):  
   # get the data for LS
   LSResult = bestResults[curve][method][evaluations]["LS"]
   LSData = getAverageAndConfidenceFromConfiguration(LSResult["path"], LSResult)
@@ -196,9 +199,6 @@ def generateComparisonPlot(bestResults, curve, method, evaluations):
   #     "SA_THRESHOLD": SA_THRESHOLDData
   #   }, f)
     
-  # use seaborn to plot the data
-  import matplotlib.pyplot as plt
-  import seaborn as sns
   
   # disable grid lines
   sns.set_style("whitegrid")
@@ -291,6 +291,90 @@ def generateComparisonPlot(bestResults, curve, method, evaluations):
   # save the figure
   fig.savefig(f"comparison_{curve}_{method}_{evaluations}.png")
   
+# create a comparison plot for a single curve and method with every evaluation
+def prepareDataForComparisonPlot(bestResults, curve, method):
+  print("bestResults: ", bestResults)
+  
+  # get the data for LS for every evaluation
+  LSAverageData = {}
+  LSConfidenceData = {}
+  # get the data for SA_FIXED for every evaluation
+  SA_FIXEDAverageData = {}
+  SA_FIXEDConfidenceData = {}
+  # get the data for SA_THRESHOLD for every evaluation
+  SA_THRESHOLDAverageData = {}
+  SA_THRESHOLDConfidenceData = {}
+  for evaluations in bestResults[curve][method]:
+    if bestResults[curve][method][evaluations]["SA"] is None:
+      continue
+    
+    LSResult = bestResults[curve][method][evaluations]["LS"]
+    # calculate average
+    LSAverageData[evaluations] = np.mean(LSResult["best_results"])
+    # add confidence interval to the data
+    LSConfidenceData[evaluations] = LSResult["confidence_interval"]
+    
+    SA_FIXEDResult = bestResults[curve][method][evaluations]["SA"]["FIXED"]
+    # calculate average
+    SA_FIXEDAverageData[evaluations] = np.mean(SA_FIXEDResult["best_results"])
+    # add confidence interval to the data
+    SA_FIXEDConfidenceData[evaluations] = SA_FIXEDResult["confidence_interval"]
+    
+    SA_THRESHOLDResult = bestResults[curve][method][evaluations]["SA"]["THRESHOLD"]
+    # calculate average
+    SA_THRESHOLDAverageData[evaluations] = np.mean(SA_THRESHOLDResult["best_results"])
+    # add confidence interval to the data
+    SA_THRESHOLDConfidenceData[evaluations] = SA_THRESHOLDResult["confidence_interval"]
+    
+  
+  dfAverage = pd.DataFrame({
+    "LS": LSAverageData,
+    "SA_FIXED": SA_FIXEDAverageData,
+    "SA_THRESHOLD": SA_THRESHOLDAverageData
+  })
+  
+  dfConfidence = pd.DataFrame({
+    "LS": LSConfidenceData,
+    "SA_FIXED": SA_FIXEDConfidenceData,
+    "SA_THRESHOLD": SA_THRESHOLDConfidenceData
+  })
+  
+    
+  
+  return dfAverage, dfConfidence
+
+def generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method):
+  # set the font size
+  sns.set(font_scale=1.5)
+  
+  # create a new figure
+  fig, ax = plt.subplots(figsize=(12, 8))
+  
+  # disable grid lines
+  ax.grid(False)
+  
+  # set the x axis label
+  ax.set_xlabel("Number of evaluations")
+  
+  # set the y axis label
+  ax.set_ylabel("Ratio")
+  
+  # set the title
+  ax.set_title(f"Comparison of LS, SA_FIXED and SA_THRESHOLD for {curve}_{method}")
+  
+  # sort dfAverage by index in the desired order
+  dfAverage = dfAverage.reindex(["10k", "20k", "50k", "100k", "200k"])
+  
+  print("dfAverage: ", dfAverage)
+  
+  # plot the data
+  # x axis: number of evaluations (logarithmic)
+  # y axis: ratio
+  # hue: strategy (LS, SA_FIXED, SA_THRESHOLD)
+  
+  sns.lineplot(data=dfAverage, ax=ax, alpha=0.5)
+  
+  fig.savefig(f"comparison2_{curve}_{method}.png")
 
 def main():
   parser = argparse.ArgumentParser()
@@ -346,9 +430,20 @@ def main():
       "SA": SAResults
     }
 
-  print(bestResults)
+  # print(bestResults)
   
-  generateComparisonPlot(bestResults, "curve25519", "mul", "200k")
+  dfAverage, dfConfidence = prepareDataForComparisonPlot(bestResults, "curve25519", "mul")
+  
+  print("dfAverage: ", dfAverage)
+  print("dfConfidence: ", dfConfidence)
+  
+  # generate a plot for every curve and method
+  for curve in bestResults:
+    for method in bestResults[curve]:
+      dfAverage, dfConfidence = prepareDataForComparisonPlot(bestResults, curve, method)
+      generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method)
+  
+  
   
   # generate a plot for every curve and method and evaluation
   # for curve in bestResults:
@@ -356,15 +451,6 @@ def main():
   #     for evaluations in bestResults[curve][method]:
   #       generateComparisonPlot(bestResults, curve, method, evaluations)
 
-# get the data
-# every configuration has a directory with 10 runs in it and the curve with method as a subdirectory
-# in every run are four independant runs with the same configuration. only the best is used and counts as a run
-# calculate an average over the 10 runs
-
-
-# plotting
-# use seaborn
-# disable grid lines
 
 
 if __name__ == "__main__":
