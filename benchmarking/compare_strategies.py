@@ -292,9 +292,7 @@ def generateSingleRunComparisonPlot(bestResults, curve, method, evaluations):
   fig.savefig(f"comparison_{curve}_{method}_{evaluations}.png")
   
 # create a comparison plot for a single curve and method with every evaluation
-def prepareDataForComparisonPlot(bestResults, curve, method):
-  print("bestResults: ", bestResults)
-  
+def prepareDataForComparisonPlot(bestResults, curve, method):  
   # get the data for LS for every evaluation
   LSAverageData = {}
   LSConfidenceData = {}
@@ -365,7 +363,16 @@ def generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method):
   # sort dfAverage by index in the desired order
   dfAverage = dfAverage.reindex(["10k", "20k", "50k", "100k", "200k"])
   
+  # sort dfConfidence by index in the desired order
+  dfConfidence = dfConfidence.reindex(["10k", "20k", "50k", "100k", "200k"])
+  
+  # remove indexes with NaN values
+  dfAverage = dfAverage.dropna()
+  dfConfidence = dfConfidence.dropna()
+  
   print("dfAverage: ", dfAverage)
+  
+  print("dfConfidence: ", dfConfidence)
   
   # plot the data
   # x axis: number of evaluations (logarithmic)
@@ -373,6 +380,26 @@ def generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method):
   # hue: strategy (LS, SA_FIXED, SA_THRESHOLD)
   
   sns.lineplot(data=dfAverage, ax=ax, alpha=0.5)
+
+  # Plot confidence intervals for each strategy
+  for column in dfConfidence.columns:
+    # Extract lower and upper bounds of confidence intervals
+    lower_bounds = [interval[0] for interval in dfConfidence[column]]
+    upper_bounds = [interval[1] for interval in dfConfidence[column]]
+
+    # Plot confidence intervals with fill_between
+    ax.fill_between(dfConfidence.index, lower_bounds, upper_bounds, alpha=0.2, label=column)
+
+    # Annotate averages to data points
+    for i, avg in enumerate(dfAverage[column]):
+      ax.annotate(f"{avg:.2f}", (dfAverage.index[i], avg), textcoords="offset points", xytext=(0, 0), fontsize=8)
+      
+    # Annotate confidence intervals to data points
+    for i, interval in enumerate(dfConfidence[column]):
+      ax.annotate(f"{interval[0]:.2f} - {interval[1]:.2f}", (dfConfidence.index[i], interval[1]), textcoords="offset points", xytext=(0, 0), fontsize=6)
+      
+
+
   
   fig.savefig(f"comparison2_{curve}_{method}.png")
 
@@ -436,6 +463,8 @@ def main():
   
   print("dfAverage: ", dfAverage)
   print("dfConfidence: ", dfConfidence)
+  
+  # generateCurveComparisonPlot(dfAverage, dfConfidence, "curve25519", "mul")
   
   # generate a plot for every curve and method
   for curve in bestResults:
