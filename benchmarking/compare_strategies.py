@@ -141,6 +141,11 @@ def findBestSAConfiguration(directories, curve, method, evaluations):
             confidenceLow = fileData["confidence_interval"][0]
             confidenceHigh = fileData["confidence_interval"][1]
             
+            # if confidenceHigh is NaN set it to the first value of best_results
+            if np.isnan(confidenceHigh):
+              confidenceLow = fileData["best_results"][0]
+              confidenceHigh = fileData["best_results"][0]
+            
             if confidenceHigh > highestConfidenceRatioFixed:
               highestConfidenceRatioFixed = confidenceHigh
               data["FIXED"] = {
@@ -149,13 +154,18 @@ def findBestSAConfiguration(directories, curve, method, evaluations):
                 "curve": identifier["curve"],
                 "method": identifier["method"],
                 "evaluations": identifier["evaluations"],
-                "confidence_interval": fileData["confidence_interval"],
+                "confidence_interval": [confidenceLow, confidenceHigh],
                 "best_results": fileData["best_results"]
               }
               
           if "SA_THRESHOLD" in identifier["configuration"]:
             confidenceLow = fileData["confidence_interval"][0]
             confidenceHigh = fileData["confidence_interval"][1]
+            
+            # if confidenceHigh is NaN set it to the first value of best_results
+            if np.isnan(confidenceHigh):
+              confidenceLow = fileData["best_results"][0]
+              confidenceHigh = fileData["best_results"][0]
             
             if confidenceHigh > highestConfidenceRatioThreshold:
               highestConfidenceRatioThreshold = confidenceHigh
@@ -165,7 +175,7 @@ def findBestSAConfiguration(directories, curve, method, evaluations):
                 "curve": identifier["curve"],
                 "method": identifier["method"],
                 "evaluations": identifier["evaluations"],
-                "confidence_interval": fileData["confidence_interval"],
+                "confidence_interval": [confidenceLow, confidenceHigh],
                 "best_results": fileData["best_results"]
               }
   # if both FIXED and THRESHOLD are not empty objects return the data. otherwise return None
@@ -307,6 +317,8 @@ def prepareDataForComparisonPlot(bestResults, curve, method):
       continue
     
     LSResult = bestResults[curve][method][evaluations]["LS"]
+    
+    print("LSResult: ", LSResult)
     # calculate average
     LSAverageData[evaluations] = np.mean(LSResult["best_results"])
     # add confidence interval to the data
@@ -380,6 +392,7 @@ def generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method):
   # hue: strategy (LS, SA_FIXED, SA_THRESHOLD)
   
   sns.lineplot(data=dfAverage, ax=ax, alpha=0.5)
+  
 
   # Plot confidence intervals for each strategy
   for column in dfConfidence.columns:
@@ -438,6 +451,12 @@ def main():
           data = json.load(f)
           
         identifier["confidence_interval"] = data["confidence_interval"]
+        
+        # if confidenceHigh is NaN set it to the first value of best_results
+        if np.isnan(identifier["confidence_interval"][1]):
+          identifier["confidence_interval"][0] = data["best_results"][0]
+          identifier["confidence_interval"][1] = data["best_results"][0]
+        
         identifier["best_results"] = data["best_results"]
         identifiers.append(identifier)
 
@@ -459,12 +478,12 @@ def main():
 
   # print(bestResults)
   
-  dfAverage, dfConfidence = prepareDataForComparisonPlot(bestResults, "curve25519", "mul")
+  # dfAverage, dfConfidence = prepareDataForComparisonPlot(bestResults, "p384", "mul")
   
-  print("dfAverage: ", dfAverage)
-  print("dfConfidence: ", dfConfidence)
+  # print("dfAverage: ", dfAverage)
+  # print("dfConfidence: ", dfConfidence)
   
-  # generateCurveComparisonPlot(dfAverage, dfConfidence, "curve25519", "mul")
+  # generateCurveComparisonPlot(dfAverage, dfConfidence, "p384", "mul")
   
   # generate a plot for every curve and method
   for curve in bestResults:
