@@ -7,7 +7,7 @@ import numpy as np
 
 from scipy import stats
 
-from utils import convertFilenameToIdentifier, findBestSAConfiguration, getDataFromConfiguration
+from utils import convertFilenameToIdentifier, findBestSAConfiguration, getDataFromConfiguration, getFullMeanAndConfidenceFromConfiguration
 
 OUTPUT_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)), "statisticalTests")
 
@@ -45,8 +45,8 @@ def calculateEffectSize(bestResults, curve, method, evaluations, includeAllRuns=
     SA_FIXEDData = bestResults[curve][method][evaluations]["SA"]["FIXED"]["best_results"]
     SA_THRESHOLDData = bestResults[curve][method][evaluations]["SA"]["THRESHOLD"]["best_results"]
   else:
-    SA_FIXEDData = getDataFromConfiguration(bestResults[curve][method][evaluations]["SA"]["FIXED"]["path"], bestResults[curve][method][evaluations]["SA"]["FIXED"])["convergence"]
-    SA_THRESHOLDData = getDataFromConfiguration(bestResults[curve][method][evaluations]["SA"]["THRESHOLD"]["path"], bestResults[curve][method][evaluations]["SA"]["THRESHOLD"])["convergence"]
+    (SA_FIXEDConfidenceAllRuns, SA_FIXEDAverageAllRuns, SA_FIXEDData) = getFullMeanAndConfidenceFromConfiguration(bestResults[curve][method][evaluations]["SA"]["FIXED"]["path"], bestResults[curve][method][evaluations]["SA"]["FIXED"]["identifier"])
+    (SA_THRESHOLDConfidenceAllRuns, SA_THRESHOLDAverageAllRuns, SA_THRESHOLDData) = getFullMeanAndConfidenceFromConfiguration(bestResults[curve][method][evaluations]["SA"]["THRESHOLD"]["path"], bestResults[curve][method][evaluations]["SA"]["THRESHOLD"]["identifier"])
     
   if len(LSData) != len(SA_FIXEDData) or len(LSData) != len(SA_THRESHOLDData):
     return {
@@ -85,6 +85,7 @@ def calculateEffectSize(bestResults, curve, method, evaluations, includeAllRuns=
 
 def main():
   parser = argparse.ArgumentParser()
+  parser.add_argument("--allRuns", help="Specify if all runs should be used")
   parser.add_argument("--directories", nargs='+', help="Specify the directories to compare")
 
   args = parser.parse_args()
@@ -158,7 +159,7 @@ def main():
         "200k": {},
       }
       for evaluations in bestResults[curve][method]:
-        effectSizeResult[evaluations] = calculateEffectSize(bestResults, curve, method, evaluations)
+        effectSizeResult[evaluations] = calculateEffectSize(bestResults, curve, method, evaluations, args.allRuns)
         
       # save to json file (curve and method) append evaluations
       outputFilePath = os.path.join(OUTPUT_DIRECTORY, "effectsize_{}_{}.json".format(curve, method))

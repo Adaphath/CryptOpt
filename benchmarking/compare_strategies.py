@@ -17,7 +17,7 @@ import seaborn as sns
 
 from scipy import stats
 
-from utils import convertFilenameToIdentifier, findBestSAConfiguration, getDataFromConfiguration
+from utils import convertFilenameToIdentifier, findBestSAConfiguration, getDataFromConfiguration, getFullMeanAndConfidenceFromConfiguration
 
 OUTPUT_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)), "plots")
 
@@ -253,11 +253,12 @@ def generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method):
 
 
   
-  outputFilePath = os.path.join(OUTPUT_DIRECTORY, f"comparison_{curve}_{method}.png")
+  outputFilePath = os.path.join(OUTPUT_DIRECTORY, f"comparison_all_{curve}_{method}.png")
   fig.savefig(outputFilePath)
 
 def main():
   parser = argparse.ArgumentParser()
+  parser.add_argument("--allRuns", help="Specify if all runs should be used")
   parser.add_argument("--directories", nargs='+', help="Specify the directories to compare")
 
   args = parser.parse_args()
@@ -294,6 +295,12 @@ def main():
         with open(os.path.join(directory, file)) as f:
           data = json.load(f)
           
+        (confidenceAllRuns, averageAllRuns, ratios) = getFullMeanAndConfidenceFromConfiguration(identifier["path"], identifier)
+        
+        identifier["confidence_interval_allRuns"] = confidenceAllRuns
+        identifier["average_allRuns"] = averageAllRuns
+        identifier["ratios"] = ratios
+          
         identifier["confidence_interval"] = data["confidence_interval"]
         
         # if confidenceHigh is NaN set it to the first value of best_results
@@ -307,6 +314,31 @@ def main():
   for identifier in identifiers:
     SAResults = findBestSAConfiguration(args.directories, identifier["curve"], identifier["method"], identifier["evaluations"])
     
+    
+    if SAResults is None:
+      continue
+    
+    (SA_FIXEDConfidenceAllRuns, SA_FIXEDAverageAllRuns, SA_FIXEDRatios) = getFullMeanAndConfidenceFromConfiguration(SAResults["FIXED"]["path"], identifier)
+    
+    (SA_THRESHOLDConfidenceAllRuns, SA_THRESHOLDAverageAllRuns, SA_THRESHOLDRatios) = getFullMeanAndConfidenceFromConfiguration(SAResults["THRESHOLD"]["path"], identifier)
+    
+    # SAResults["FIXED"]["confidence_interval_allRuns"] = SAFIXED_confidenceAllRuns
+    # SAResults["FIXED"]["average_allRuns"] = SAFIXED_averageAllRuns
+    
+    # SAResults["THRESHOLD"]["confidence_interval_allRuns"] = SATHRESHOLD_confidenceAllRuns
+    # SAResults["THRESHOLD"]["average_allRuns"] = SATHRESHOLD_averageAllRuns
+    
+    
+    if args.allRuns:
+      identifier["confidence_interval"] = identifier["confidence_interval_allRuns"]
+      identifier["best_results"] = identifier["ratios"]
+      
+      SAResults["FIXED"]["confidence_interval"] = SA_FIXEDConfidenceAllRuns
+      SAResults["FIXED"]["best_results"] = SA_FIXEDRatios
+      
+      SAResults["THRESHOLD"]["confidence_interval"] = SA_THRESHOLDConfidenceAllRuns
+      SAResults["THRESHOLD"]["best_results"] = SA_THRESHOLDRatios
+      
     bestResults[identifier["curve"]][identifier["method"]][identifier["evaluations"]] = {
       "LS": {
         "configuration": identifier["configuration"],

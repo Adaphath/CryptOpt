@@ -21,7 +21,7 @@ import numpy as np
 
 from scipy import stats
 
-from utils import convertFilenameToIdentifier, findBestSAConfiguration, getDataFromConfiguration
+from utils import convertFilenameToIdentifier, findBestSAConfiguration, getDataFromConfiguration, getFullMeanAndConfidenceFromConfiguration
 
 OUTPUT_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)), "statisticalTests")
 
@@ -47,8 +47,8 @@ def calculateMannWhitneyU(bestResults, curve, method, evaluations, includeAllRun
     SA_FIXEDData = bestResults[curve][method][evaluations]["SA"]["FIXED"]["best_results"]
     SA_THRESHOLDData = bestResults[curve][method][evaluations]["SA"]["THRESHOLD"]["best_results"]
   else:
-    SA_FIXEDData = getDataFromConfiguration(bestResults[curve][method][evaluations]["SA"]["FIXED"]["path"], bestResults[curve][method][evaluations]["SA"]["FIXED"])["convergence"]
-    SA_THRESHOLDData = getDataFromConfiguration(bestResults[curve][method][evaluations]["SA"]["THRESHOLD"]["path"], bestResults[curve][method][evaluations]["SA"]["THRESHOLD"])["convergence"]
+    (SA_FIXEDConfidenceAllRuns, SA_FIXEDAverageAllRuns, SA_FIXEDData) = getFullMeanAndConfidenceFromConfiguration(bestResults[curve][method][evaluations]["SA"]["FIXED"]["path"], bestResults[curve][method][evaluations]["SA"]["FIXED"]["identifier"])
+    (SA_THRESHOLDConfidenceAllRuns, SA_THRESHOLDAverageAllRuns, SA_THRESHOLDData) = getFullMeanAndConfidenceFromConfiguration(bestResults[curve][method][evaluations]["SA"]["THRESHOLD"]["path"], bestResults[curve][method][evaluations]["SA"]["THRESHOLD"]["identifier"])
   
   LS_SA_FIXED_uStatistic, LS_SA_FIXED_pValue = stats.mannwhitneyu(LSData, SA_FIXEDData, alternative="two-sided")
   
@@ -71,6 +71,7 @@ def calculateMannWhitneyU(bestResults, curve, method, evaluations, includeAllRun
 
 def main():
   parser = argparse.ArgumentParser()
+  parser.add_argument("--allRuns", help="Specify if all runs should be used")
   parser.add_argument("--directories", nargs='+', help="Specify the directories to compare")
 
   args = parser.parse_args()
@@ -144,7 +145,7 @@ def main():
         "200k": {},
       }
       for evaluations in bestResults[curve][method]:
-        mannWhitneyResult[evaluations] = calculateMannWhitneyU(bestResults, curve, method, evaluations)
+        mannWhitneyResult[evaluations] = calculateMannWhitneyU(bestResults, curve, method, evaluations, args.allRuns)
         
       # save to json file (curve and method) append evaluations
       outputFilePath = os.path.join(OUTPUT_DIRECTORY, "mannwhitneyu_{}_{}.json".format(curve, method))
