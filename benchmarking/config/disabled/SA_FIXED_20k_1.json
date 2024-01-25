@@ -2,7 +2,7 @@
   "option": "SA",
   "evals": 20000,
   "acceptanceRate": 0.85,
-  "coolingRateAlpha": 0.93,
+  "coolingRateAlpha": 0.95,
   "temperatureLengthType": "TL1",
   "lengthConstant": 0.005
 }
