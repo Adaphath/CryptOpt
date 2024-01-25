@@ -1,18 +1,4 @@
 #!/usr/bin/env python3
-# mann-whitney u test (rank sum test)
-
-# steps:
-# 1. load all runs from best configuration / LS = every run
-# 2. use data from all runs to calculate mann-whitney u test
-
-#!/usr/bin/env python3
-
-# define directories
-# and plot the results
-
-# we will compare three strategies: LS, SA (fixed interval) and SA (acceptance threshold)
-# we will get a list of directories
-# in a first step we will print out the best results for every strategy
 
 import argparse
 import json
@@ -25,6 +11,7 @@ from utils import convertFilenameToIdentifier, findBestSAConfiguration, getDataF
 
 OUTPUT_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)), "statisticalTests")
 
+# inspired from: https://machinelearningmastery.com/effect-size-measures-in-python/
 def cohen_d(group1, group2):
     # Calculate the means and standard deviations
     mean1, mean2 = np.mean(group1), np.mean(group2)
