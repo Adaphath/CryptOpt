@@ -37,14 +37,10 @@ def convertFilenameToIdentifier(filename):
   }
 
 def getDataFromConfiguration(directory, identifier):
-  print("directory: ", directory)
-  print("identifier: ", identifier)
   resultDir = directory
   
   curve = identifier["curve"]
   method = identifier["method"]
-  
-  print("result_dir: ", resultDir)
   
   # read all json files in the directory
   # load the every json file in the run directory
@@ -111,6 +107,53 @@ def getDataFromConfiguration(directory, identifier):
   #   json.dump(outputData, f)
   
   return outputData
+
+def getFullMeanAndConfidenceFromConfiguration(directory, identifier):
+  resultDir = directory
+  
+  curve = identifier["curve"]
+  method = identifier["method"]
+  
+  # read all json files in the directory
+  # load the every json file in the run directory
+  inputData = []
+  
+  ratios = []
+  
+  # iterate through all runs
+  for run in range(0, MAX_RUNS):
+    runData = []
+    runDirectory = os.path.join(resultDir, f"run{run}", "fiat", f"fiat_{curve}_{method}")
+    
+    # check if the directory exists
+    if not os.path.isdir(runDirectory):
+      runDirectory = os.path.join(resultDir, f"run{run}", "fiat", f"fiat_{curve}_carry_{method}")
+      
+    if not os.path.isdir(runDirectory):
+      continue
+      
+    # iterate through all files
+    for filename in os.listdir(runDirectory):
+      if filename.endswith('.json') and '_details' in filename:
+        seed = filename.split("_")[0]
+        # check if there is a file with the same name but only with the seed in the beginning "seed_"
+        # if there is not, skip this file
+        if not os.path.isfile(os.path.join(runDirectory, f"{seed}.dat")):       continue
+        filepath = os.path.join(runDirectory, filename)
+        with open(filepath) as f:
+          runData.append(json.load(f))
+          
+    # collect ratios of run
+    ratios.extend([runData[i]["ratio"] for i in range(0, len(runData))])
+    
+  
+  # calculate the mean and confidence interval for the ratios
+  ratiosFloats = [float(i) for i in ratios]
+  average = np.mean(ratiosFloats, dtype=np.float64)
+  confidenceInterval = stats.t.interval(0.95, len(ratiosFloats)-1, loc=average, scale=stats.sem(ratiosFloats))
+  
+  
+  return confidenceInterval, average, ratiosFloats
   
 def findBestSAConfiguration(directories, curve, method, evaluations):
   # there are two types: FIXED and THRESHOLD
@@ -123,6 +166,9 @@ def findBestSAConfiguration(directories, curve, method, evaluations):
   
   highestConfidenceRatioFixed = 0
   highestConfidenceRatioThreshold = 0
+
+  highestAverageRatioFixed = 0
+  highestAverageRatioThreshold = 0
   for directory in directories:
     for file in os.listdir(directory):
       if file.startswith("best_results_SA_FIXED") or file.startswith("MARKED_best_results_SA_FIXED") or file.startswith("best_results_SA_THRESHOLD") or file.startswith("MARKED_best_results_SA_THRESHOLD"):
@@ -136,15 +182,20 @@ def findBestSAConfiguration(directories, curve, method, evaluations):
           if "SA_FIXED" in identifier["configuration"]:
             confidenceLow = fileData["confidence_interval"][0]
             confidenceHigh = fileData["confidence_interval"][1]
+
+            averageBestResults = np.mean(fileData["best_results"])
             
             # if confidenceHigh is NaN set it to the first value of best_results
             if np.isnan(confidenceHigh):
               confidenceLow = fileData["best_results"][0]
               confidenceHigh = fileData["best_results"][0]
             
-            if confidenceHigh > highestConfidenceRatioFixed:
+            # if confidenceHigh > highestConfidenceRatioFixed:
+            if averageBestResults > highestAverageRatioFixed:
               highestConfidenceRatioFixed = confidenceHigh
+              highestAverageRatioFixed = averageBestResults
               data["FIXED"] = {
+                "identifier": identifier,
                 "configuration": identifier["configuration"],
                 "path": os.path.join(directory, identifier["configuration"]),
                 "curve": identifier["curve"],
@@ -157,15 +208,20 @@ def findBestSAConfiguration(directories, curve, method, evaluations):
           if "SA_THRESHOLD" in identifier["configuration"]:
             confidenceLow = fileData["confidence_interval"][0]
             confidenceHigh = fileData["confidence_interval"][1]
+
+            averageBestResults = np.mean(fileData["best_results"])
             
             # if confidenceHigh is NaN set it to the first value of best_results
             if np.isnan(confidenceHigh):
               confidenceLow = fileData["best_results"][0]
               confidenceHigh = fileData["best_results"][0]
             
-            if confidenceHigh > highestConfidenceRatioThreshold:
+            # if confidenceHigh > highestConfidenceRatioThreshold:
+            if averageBestResults > highestAverageRatioThreshold:
               highestConfidenceRatioThreshold = confidenceHigh
+              highestAverageRatioThreshold = averageBestResults
               data["THRESHOLD"] = {
+                "identifier": identifier,
                 "configuration": identifier["configuration"],
                 "path": os.path.join(directory, identifier["configuration"]),
                 "curve": identifier["curve"],
