@@ -29,7 +29,7 @@ def calculateMannWhitneyU(bestResults, curve, method, evaluations, includeAllRun
   if not includeAllRuns:
     LSData = bestResults[curve][method][evaluations]["LS"]["best_results"]
   else:
-    LSData = getDataFromConfiguration(bestResults[curve][method][evaluations]["LS"]["path"], bestResults[curve][method][evaluations]["LS"])["convergence"]
+    (LSConfidenceAllRuns, LSAverageAllRuns, LSData) = getFullMeanAndConfidenceFromConfiguration(bestResults[curve][method][evaluations]["LS"]["path"], bestResults[curve][method][evaluations]["LS"]["identifier"])
   
   if bestResults[curve][method][evaluations]["SA"] is None:
     return {
@@ -71,7 +71,7 @@ def calculateMannWhitneyU(bestResults, curve, method, evaluations, includeAllRun
 
 def main():
   parser = argparse.ArgumentParser()
-  parser.add_argument("--allRuns", help="Specify if all runs should be used")
+  parser.add_argument("--allRuns", help="Specify if all runs should be used", action="store_true")
   parser.add_argument("--directories", nargs='+', help="Specify the directories to compare")
 
   args = parser.parse_args()
@@ -123,6 +123,7 @@ def main():
     
     bestResults[identifier["curve"]][identifier["method"]][identifier["evaluations"]] = {
       "LS": {
+        "identifier": identifier,
         "configuration": identifier["configuration"],
         "path": identifier["path"],
         "curve": identifier["curve"],
@@ -147,8 +148,13 @@ def main():
       for evaluations in bestResults[curve][method]:
         mannWhitneyResult[evaluations] = calculateMannWhitneyU(bestResults, curve, method, evaluations, args.allRuns)
         
+      fileName = "mannwhitneyu_{}_{}.json".format(curve, method)
+      
+      if args.allRuns:
+        fileName = "mannwhitneyu_{}_{}_allRuns.json".format(curve, method)
+        
       # save to json file (curve and method) append evaluations
-      outputFilePath = os.path.join(OUTPUT_DIRECTORY, "mannwhitneyu_{}_{}.json".format(curve, method))
+      outputFilePath = os.path.join(OUTPUT_DIRECTORY, fileName)
       with open(outputFilePath, "w") as f:
         json.dump(mannWhitneyResult, f, indent=2)
 

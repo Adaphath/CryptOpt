@@ -29,9 +29,10 @@ def calculateEffectSize(bestResults, curve, method, evaluations, includeAllRuns=
   if not includeAllRuns:
     LSData = bestResults[curve][method][evaluations]["LS"]["best_results"]
   else:
-    LSData = getDataFromConfiguration(bestResults[curve][method][evaluations]["LS"]["path"], bestResults[curve][method][evaluations]["LS"])["convergence"]
+    (LSConfidenceAllRuns, LSAverageAllRuns, LSData) = getFullMeanAndConfidenceFromConfiguration(bestResults[curve][method][evaluations]["LS"]["path"], bestResults[curve][method][evaluations]["LS"]["identifier"])
   
   if bestResults[curve][method][evaluations]["SA"] is None:
+    print("no sa data for: {} {} {}".format(curve, method, evaluations))
     return {
       "LS_SA_FIXED": {
         "d": None,
@@ -48,15 +49,19 @@ def calculateEffectSize(bestResults, curve, method, evaluations, includeAllRuns=
     (SA_FIXEDConfidenceAllRuns, SA_FIXEDAverageAllRuns, SA_FIXEDData) = getFullMeanAndConfidenceFromConfiguration(bestResults[curve][method][evaluations]["SA"]["FIXED"]["path"], bestResults[curve][method][evaluations]["SA"]["FIXED"]["identifier"])
     (SA_THRESHOLDConfidenceAllRuns, SA_THRESHOLDAverageAllRuns, SA_THRESHOLDData) = getFullMeanAndConfidenceFromConfiguration(bestResults[curve][method][evaluations]["SA"]["THRESHOLD"]["path"], bestResults[curve][method][evaluations]["SA"]["THRESHOLD"]["identifier"])
     
-  if len(LSData) != len(SA_FIXEDData) or len(LSData) != len(SA_THRESHOLDData):
-    return {
-      "LS_SA_FIXED": {
-        "d": None,
-      },
-      "LS_SA_THRESHOLD": {
-        "d": None,
-      }
-    }
+  # if len(LSData) != len(SA_FIXEDData) or len(LSData) != len(SA_THRESHOLDData):
+  #   print("lengths do not match for: {} {} {}".format(curve, method, evaluations))
+  #   print("LS: {}".format(len(LSData)))
+  #   print("SA_FIXED: {}".format(len(SA_FIXEDData)))
+  #   print("SA_THRESHOLD: {}".format(len(SA_THRESHOLDData)))
+  #   return {
+  #     "LS_SA_FIXED": {
+  #       "d": None,
+  #     },
+  #     "LS_SA_THRESHOLD": {
+  #       "d": None,
+  #     }
+  #   }
     
   if len(LSData) < 2 or len(SA_FIXEDData) < 2 or len(SA_THRESHOLDData) < 2:
     return {
@@ -85,7 +90,7 @@ def calculateEffectSize(bestResults, curve, method, evaluations, includeAllRuns=
 
 def main():
   parser = argparse.ArgumentParser()
-  parser.add_argument("--allRuns", help="Specify if all runs should be used")
+  parser.add_argument("--allRuns", help="Specify if all runs should be used", action="store_true")
   parser.add_argument("--directories", nargs='+', help="Specify the directories to compare")
 
   args = parser.parse_args()
@@ -137,6 +142,7 @@ def main():
     
     bestResults[identifier["curve"]][identifier["method"]][identifier["evaluations"]] = {
       "LS": {
+        "identifier": identifier,
         "configuration": identifier["configuration"],
         "path": identifier["path"],
         "curve": identifier["curve"],
@@ -161,8 +167,13 @@ def main():
       for evaluations in bestResults[curve][method]:
         effectSizeResult[evaluations] = calculateEffectSize(bestResults, curve, method, evaluations, args.allRuns)
         
+      fileName = "effectsize_{}_{}.json".format(curve, method)
+      
+      if args.allRuns:
+        fileName = "effectsize_{}_{}_allRuns.json".format(curve, method)
+        
       # save to json file (curve and method) append evaluations
-      outputFilePath = os.path.join(OUTPUT_DIRECTORY, "effectsize_{}_{}.json".format(curve, method))
+      outputFilePath = os.path.join(OUTPUT_DIRECTORY, fileName)
       with open(outputFilePath, "w") as f:
         json.dump(effectSizeResult, f, indent=2)
 
