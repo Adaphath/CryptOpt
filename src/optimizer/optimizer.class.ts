@@ -364,16 +364,16 @@ export class Optimizer {
 
           // metroplis condition for simulated annealing
           // use the relative improvement
-          const metropolisCondition = Math.exp(-absoluteImprovement / temperature);
+          const metropolisProbability = Math.exp(-absoluteImprovement / temperature);
 
-          const metropolis = mutatedIsBetter || metropolisCondition > Math.random();
+          const metropolisCondition = mutatedIsBetter || metropolisProbability > Math.random();
 
           if (
             (this.args.optimizer === "LS" && mutatedIsBetter) || // local random search
-            (this.args.optimizer === "SA" && metropolis) // simulated annealing
+            (this.args.optimizer === "SA" && metropolisCondition) // simulated annealing
           ) {
             // worse function is kept because of metropolis condition
-            if (this.args.optimizer === "SA" && metropolis && !mutatedIsBetter) {
+            if (this.args.optimizer === "SA" && metropolisCondition && !mutatedIsBetter) {
               // Logger.dev(`Kept worse function. Metropolis condition: ${metropolisCondition}`);
               // Logger.dev(`absolute improvement: ${absoluteImprovement}`);
               // Logger.dev(`Current temperature: ${temperature}`);
