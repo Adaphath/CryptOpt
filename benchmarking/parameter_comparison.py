@@ -28,7 +28,8 @@ OUTPUT_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)), "pl
 
 
 def generateParameterComparisonGraph(
-  data
+  data,
+  params
 ):
   # extract the parameters and results from data
   # data = [
@@ -69,10 +70,10 @@ def generateParameterComparisonGraph(
   z = [comb[2] for comb in combinations]
   c = [results[comb] for comb in combinations]
 
-  sc = ax.plot(x, y, z, c=c, cmap=cm.coolwarm, vmin=min(c), vmax=max(c))
+  sc = ax.scatter(x, y, z, c=c, cmap=cm.coolwarm, vmin=min(c), vmax=max(c))
 
   # add color bar
-  cbar = fig.colorbar(sc, ticks=[min(c), max(c) / 2, max(c)])
+  cbar = fig.colorbar(sc, ticks=[min(c), 5, max(c)], pad=0.15)
 
   # set labels
   cbar.set_label('Average of Best Results')
@@ -82,7 +83,7 @@ def generateParameterComparisonGraph(
   ax.set_ylabel('Cooling Rate Alpha')
   ax.set_zlabel('Length Param (Constant or Threshold)')
 
-  outputFilePath = os.path.join(OUTPUT_DIRECTORY, f"comparison_parameters4d.png")
+  outputFilePath = os.path.join(OUTPUT_DIRECTORY, f"parameter_comparison_{params.get('curve')}_{params.get('method')}_{params.get('temperatureLength')}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.svg")
   fig.savefig(outputFilePath)
 
   # print out best result with corresponding parameters
@@ -199,7 +200,11 @@ def main():
             
   print(configurationData)
   
-  generateParameterComparisonGraph(configurationData)
+  generateParameterComparisonGraph(configurationData, {
+    "curve": curve,
+    "method": method,
+    "temperatureLength": temperatureLengthType
+  })
 
 if __name__ == "__main__":
   main()
