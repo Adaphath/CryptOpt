@@ -192,7 +192,7 @@ def prepareDataForComparisonPlot(bestResults, curve, method):
   
   return dfAverage, dfConfidence
 
-def generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method):
+def generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method, includeAllRuns=False):
   # set the font size
   sns.set(font_scale=1.5)
   
@@ -238,6 +238,10 @@ def generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method):
     # Extract lower and upper bounds of confidence intervals
     lower_bounds = [interval[0] for interval in dfConfidence[column]]
     upper_bounds = [interval[1] for interval in dfConfidence[column]]
+    
+    # check if lower_bounds and upper_bounds are empty
+    if len(lower_bounds) == 0 or len(upper_bounds) == 0:
+      continue
 
     # Plot confidence intervals with fill_between
     ax.fill_between(dfConfidence.index, lower_bounds, upper_bounds, alpha=0.2, label=column)
@@ -252,13 +256,16 @@ def generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method):
       
 
 
+  outputFileName = f"comparison_{curve}_{method}"
+  if includeAllRuns:  
+    outputFileName += "_allRuns"
   
-  outputFilePath = os.path.join(OUTPUT_DIRECTORY, f"comparison_all_{curve}_{method}.png")
+  outputFilePath = os.path.join(OUTPUT_DIRECTORY, f"{outputFileName}.svg")
   fig.savefig(outputFilePath)
 
 def main():
   parser = argparse.ArgumentParser()
-  parser.add_argument("--allRuns", help="Specify if all runs should be used")
+  parser.add_argument("--allRuns", help="Specify if all runs should be used", action="store_true")
   parser.add_argument("--directories", nargs='+', help="Specify the directories to compare")
 
   args = parser.parse_args()
@@ -365,7 +372,7 @@ def main():
   for curve in bestResults:
     for method in bestResults[curve]:
       dfAverage, dfConfidence = prepareDataForComparisonPlot(bestResults, curve, method)
-      generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method)
+      generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method, args.allRuns)
   
   
   
