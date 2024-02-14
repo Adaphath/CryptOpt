@@ -1,0 +1,11 @@
+Directories:
+2023-12-15_20-36-06: P256; all evaluations (10 runs)
+2023-12-21_20-44-31: Curve25519; all evaluations (10 runs)
+2024-01-19_20-10-41: P384; all evaluations (10 runs)
+
+Generalized configs (used in thesis):
+2023-12-23_02-06-10: Curve25519 + P256; 10k + 20k (10 runs)
+2023-12-31_22-35-25: Curve25519 + P256; 100k + 200k (10 runs)
+2024-01-25_18-06-06: P384; 100k + 200k (10 runs)
+
+Command for generalized configs (missing 10k + 20k for p384): ./benchmarking/compare_strategies.py --directories results/2023-12-15_20-36-06/ results/2023-12-21_20-44-31/ results/2023-12-23_02-06-10/ results/2023-12-31_22-35-25/ results/2024-01-25_18-06-06/ results/2024-01-19_20-10-41/
