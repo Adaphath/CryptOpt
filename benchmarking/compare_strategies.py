@@ -141,7 +141,8 @@ def generateSingleRunComparisonPlot(bestResults, curve, method, evaluations):
   fig.savefig(outputFilePath)
   
 # create a comparison plot for a single curve and method with every evaluation
-def prepareDataForComparisonPlot(bestResults, curve, method):  
+def prepareDataForComparisonPlot(bestResults, curve, method, singleShotBestResult=False):
+  
   # get the data for LS for every evaluation
   LSAverageData = {}
   LSConfidenceData = {}
@@ -175,24 +176,33 @@ def prepareDataForComparisonPlot(bestResults, curve, method):
     # add confidence interval to the data
     SA_THRESHOLDConfidenceData[evaluations] = SA_THRESHOLDResult["confidence_interval"]
     
+    # if singleShotBestResult we do not calculate the average but use the best result in best_results
+    if singleShotBestResult:
+      # get best result for LS
+      LSAverageData[evaluations] = np.max(LSResult["best_results"])
+      # get best result for SA_FIXED
+      SA_FIXEDAverageData[evaluations] = np.max(SA_FIXEDResult["best_results"])
+      # get best result for SA_THRESHOLD
+      SA_THRESHOLDAverageData[evaluations] = np.max(SA_THRESHOLDResult["best_results"])
+    
   
   dfAverage = pd.DataFrame({
     "LS": LSAverageData,
     "SA_FIXED": SA_FIXEDAverageData,
-    "SA_THRESHOLD": SA_THRESHOLDAverageData
+    "SA_ADAPTIVE": SA_THRESHOLDAverageData
   })
   
   dfConfidence = pd.DataFrame({
     "LS": LSConfidenceData,
     "SA_FIXED": SA_FIXEDConfidenceData,
-    "SA_THRESHOLD": SA_THRESHOLDConfidenceData
+    "SA_ADAPTIVE": SA_THRESHOLDConfidenceData
   })
   
     
   
   return dfAverage, dfConfidence
 
-def generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method, includeAllRuns=False):
+def generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method, includeAllRuns=False, singleShotBestResult=False):
   # set the font size
   sns.set(font_scale=1.5)
   
@@ -209,7 +219,7 @@ def generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method, includeA
   ax.set_ylabel("Ratio")
   
   # set the title
-  ax.set_title(f"Comparison of LS, SA_FIXED and SA_THRESHOLD for {curve}_{method}")
+  ax.set_title(f"Comparison of LS, SA_FIXED and SA_ADAPTIVE for {curve}_{method}")
   
   # sort dfAverage by index in the desired order
   dfAverage = dfAverage.reindex(["10k", "20k", "50k", "100k", "200k"])
@@ -244,21 +254,25 @@ def generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method, includeA
       continue
 
     # Plot confidence intervals with fill_between
-    ax.fill_between(dfConfidence.index, lower_bounds, upper_bounds, alpha=0.2, label=column)
+    if not singleShotBestResult:
+      ax.fill_between(dfConfidence.index, lower_bounds, upper_bounds, alpha=0.2, label=column)
 
     # Annotate averages to data points
     for i, avg in enumerate(dfAverage[column]):
       ax.annotate(f"{avg:.2f}", (dfAverage.index[i], avg), textcoords="offset points", xytext=(0, 0), fontsize=8)
       
     # Annotate confidence intervals to data points
-    for i, interval in enumerate(dfConfidence[column]):
-      ax.annotate(f"{interval[0]:.2f} - {interval[1]:.2f}", (dfConfidence.index[i], interval[1]), textcoords="offset points", xytext=(0, 0), fontsize=6)
+    # for i, interval in enumerate(dfConfidence[column]):
+    #   ax.annotate(f"{interval[0]:.2f} - {interval[1]:.2f}", (dfConfidence.index[i], interval[1]), textcoords="offset points", xytext=(0, 0), fontsize=6)
       
 
 
   outputFileName = f"comparison_{curve}_{method}"
   if includeAllRuns:  
     outputFileName += "_allRuns"
+  
+  if singleShotBestResult:
+    outputFileName += "_singleShotBestResult"
   
   outputFilePath = os.path.join(OUTPUT_DIRECTORY, f"{outputFileName}.svg")
   fig.savefig(outputFilePath)
@@ -267,6 +281,7 @@ def main():
   parser = argparse.ArgumentParser()
   parser.add_argument("--allRuns", help="Specify if all runs should be used", action="store_true")
   parser.add_argument("--directories", nargs='+', help="Specify the directories to compare")
+  parser.add_argument("--singleShot", help="Specify if the best result of best_results should be used", action="store_true")
 
   args = parser.parse_args()
   identifiers = []
@@ -371,8 +386,8 @@ def main():
   # generate a plot for every curve and method
   for curve in bestResults:
     for method in bestResults[curve]:
-      dfAverage, dfConfidence = prepareDataForComparisonPlot(bestResults, curve, method)
-      generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method, args.allRuns)
+      dfAverage, dfConfidence = prepareDataForComparisonPlot(bestResults, curve, method, args.singleShot)
+      generateCurveComparisonPlot(dfAverage, dfConfidence, curve, method, args.allRuns, args.singleShot)
   
   
   
